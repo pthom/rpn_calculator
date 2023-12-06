@@ -1,8 +1,10 @@
 // A Simple RPN calculator application
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include "immapp/immapp.h"
 #include "imgui.h"
 
 #include <deque>
+#include <stack>
 #include <vector>
 #include <map>
 #include <optional>
@@ -27,7 +29,7 @@ enum class ButtonType
 struct CalculatorButton
 {
     std::string Label;
-    ButtonType  Type;
+    ButtonType  Type = ButtonType::Digit;
     bool        IsDoubleWidth = false;
 };
 
@@ -36,7 +38,7 @@ struct CalculatorButtonWithInverse
     CalculatorButton Button;
     std::optional<CalculatorButton> InverseButton = std::nullopt;
 
-    const CalculatorButton& GetCurrentButton(bool inverseMode) const
+    [[nodiscard]] const CalculatorButton& GetCurrentButton(bool inverseMode) const
     {
         if (inverseMode && InverseButton.has_value())
             return InverseButton.value();
@@ -59,6 +61,7 @@ struct CalculatorButtonWithInverse
             InverseButton = CalculatorButton{ inverseLabel, Button.Type };
             if (inverseType.has_value())
                 InverseButton->Type = inverseType.value();
+            InverseButton->IsDoubleWidth = Button.IsDoubleWidth;
         }
     }
 };
@@ -120,7 +123,7 @@ struct CalculatorLayoutDefinition
         { "Drop", ButtonType::StackOperator },
         { "Clear", ButtonType::StackOperator }},
 
-        {{"Enter", ButtonType::Enter},
+        {{"Enter", ButtonType::Enter, "Undo"},
         { "E", ButtonType::Digit},
         { "<=", ButtonType::Backspace }},
 
@@ -150,6 +153,40 @@ struct CalculatorLayoutDefinition
 };
 
 
+struct UndoableNumberStack
+{
+    std::deque<double> Stack;
+    std::stack<std::deque<double>> _undoStack;
+
+    size_t size() const { return Stack.size(); }
+    bool empty() const { return Stack.empty(); }
+    double back() const { return Stack.back();}
+    double operator[](int index) const { return Stack[index]; }
+
+    void push_back(double v) { _undoStack.push(Stack); Stack.push_back(v); }
+
+    void undo()
+    {
+        if (_undoStack.empty())
+            return;
+        Stack = _undoStack.top();
+        _undoStack.pop();
+    }
+
+    void pop_back()
+    {
+        _undoStack.push(Stack);
+        Stack.pop_back();
+    }
+
+    void clear()
+    {
+        _undoStack.push(Stack);
+        Stack.clear();
+    }
+};
+
+
 struct CalculatorState
 {
     enum class AngleUnit
@@ -157,7 +194,8 @@ struct CalculatorState
         Deg, Rad, Grad
     };
 
-    std::deque<double> Stack;
+    UndoableNumberStack Stack;
+
     std::string Input;
     std::string ErrorMessage;
     bool InverseMode = false;
@@ -181,6 +219,14 @@ struct CalculatorState
 
         Input = "";
         return success;
+    }
+
+    void _onEnter()
+    {
+        if (InverseMode)
+            Stack.undo();
+        else
+            (void)_stackInput();
     }
 
     void _onDirectNumber(const std::string& label)
@@ -376,7 +422,7 @@ struct CalculatorState
         else if (button.Type == ButtonType::DirectNumber)
             _onDirectNumber(button.Label);
         else if (button.Type == ButtonType::Enter)
-            _stackInput();
+            _onEnter();
         else if (button.Type == ButtonType::StackOperator)
             _onStackOperator(button.Label);
         else if (button.Type == ButtonType::BinaryOperator)
@@ -422,12 +468,27 @@ bool DrawOneButton(
     const CalculatorButton& button,
     bool inverseMode,
     ImVec2 standardSize,
-    ImVec2 doubleButtonSize)
+    ImVec2 doubleButtonSize,
+    ImFont* inverseFont
+    )
 {
     ImVec2 buttonSize =  button.IsDoubleWidth ? doubleButtonSize : standardSize;
     ImVec4 color = ButtonColors[button.Type];
     ImGui::PushStyleColor(ImGuiCol_Button, color);
+
+    ImVec2 invPosition = ImGui::GetCursorScreenPos();
+    invPosition.x += buttonSize.x - ImmApp::EmSize(1.f);
+
     bool pressed = ImGui::Button(button.Label.c_str(), buttonSize);
+    if (inverseMode)
+    {
+        ImGui::PushFont(inverseFont);
+        ImGui::GetForegroundDrawList()->AddText(
+            invPosition,
+            ImGui::GetColorU32(ImGuiCol_Text),
+            "inv");
+        ImGui::PopFont();
+    }
     ImGui::PopStyleColor();
     return pressed;
 }
@@ -473,9 +534,9 @@ std::optional<CalculatorButton> LayoutButtons(AppState& appState)
         ImGui::SetCursorPosX(calculatorBorderMargin);
         for (const auto& buttonWithInverse: buttonRow)
         {
-            bool inverseMode = appState.CalculatorState.InverseMode;
+            bool inverseMode = appState.CalculatorState.InverseMode && buttonWithInverse.InverseButton.has_value();
             const CalculatorButton& button = buttonWithInverse.GetCurrentButton(inverseMode);
-            if (DrawOneButton(button, inverseMode, standardButtonSize, doubleButtonSize))
+            if (DrawOneButton(button, inverseMode, standardButtonSize, doubleButtonSize, appState.MessageFont))
                 pressedButton = button;
             ImGui::SameLine();
         }
