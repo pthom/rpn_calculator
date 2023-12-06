@@ -154,7 +154,7 @@ struct CalculatorLayoutDefinition
     };
 
     int DisplayedStackSize = 4;
-    int NbDecimals = 16;
+    int NbDecimals = 12;
 };
 
 
@@ -167,8 +167,9 @@ struct UndoableNumberStack
     bool empty() const { return Stack.empty(); }
     double back() const { return Stack.back();}
     double operator[](int index) const { return Stack[index]; }
-
-    void push_back(double v) { _undoStack.push(Stack); Stack.push_back(v); }
+    void push_back(double v) { Stack.push_back(v); }
+    void pop_back() { Stack.pop_back(); }
+    void clear() { Stack.clear(); }
 
     void undo()
     {
@@ -178,16 +179,9 @@ struct UndoableNumberStack
         _undoStack.pop();
     }
 
-    void pop_back()
+    void store_undo()
     {
         _undoStack.push(Stack);
-        Stack.pop_back();
-    }
-
-    void clear()
-    {
-        _undoStack.push(Stack);
-        Stack.clear();
     }
 
     // Serialization
@@ -195,16 +189,6 @@ struct UndoableNumberStack
     {
         json j;
         j["Stack"] = Stack;
-
-        // Since std::stack doesn't have iterators, we need to temporarily convert it
-        std::vector<std::deque<double>> undoStackVec;
-        std::stack<std::deque<double>> tempUndoStack = _undoStack;
-        while (!tempUndoStack.empty()) {
-            undoStackVec.push_back(tempUndoStack.top());
-            tempUndoStack.pop();
-        }
-        j["_undoStack"] = undoStackVec;
-
         return j;
     }
 
@@ -212,10 +196,6 @@ struct UndoableNumberStack
     void from_json(const json& j)
     {
         Stack = j["Stack"].get<std::deque<double>>();
-
-        std::vector<std::deque<double>> undoStackVec = j["_undoStack"];
-        for (auto v: undoStackVec)
-            _undoStack.push(v);
     }
 };
 
@@ -251,6 +231,7 @@ struct CalculatorState
 
         try {
             double v = std::stod(Input);
+            Stack.store_undo();
             Stack.push_back(v);
             success = true;
         }
@@ -286,6 +267,7 @@ struct CalculatorState
                 ErrorMessage = "Not enough values on the stack";
                 return;
             }
+            Stack.store_undo();
             double a = Stack.back();
             Stack.pop_back();
             double b = Stack.back();
@@ -300,6 +282,7 @@ struct CalculatorState
                 ErrorMessage = "Not enough values on the stack";
                 return;
             }
+            Stack.store_undo();
             double a = Stack.back();
             Stack.push_back(a);
         }
@@ -310,10 +293,12 @@ struct CalculatorState
                 ErrorMessage = "Not enough values on the stack";
                 return;
             }
+            Stack.store_undo();
             Stack.pop_back();
         }
         else if (cmd == "Clear")
         {
+            Stack.store_undo();
             Stack.clear();
         }
     }
@@ -327,6 +312,7 @@ struct CalculatorState
             ErrorMessage = "Not enough values on the stack";
             return;
         }
+        Stack.store_undo();
         double b = Stack.back();
         Stack.pop_back();
         double a = Stack.back();
@@ -377,6 +363,7 @@ struct CalculatorState
             ErrorMessage = "Not enough values on the stack";
             return;
         }
+        Stack.store_undo();
         double a = Stack.back();
         Stack.pop_back();
         if (cmd == "sin")
@@ -435,6 +422,7 @@ struct CalculatorState
                 ErrorMessage = "Not enough values on the stack";
                 return;
             }
+            Stack.store_undo();
             double a = Stack.back();
             Stack.pop_back();
             if (cmd == "To Deg")
@@ -489,7 +477,8 @@ struct CalculatorState
     }
 
     // Deserialization
-    void from_json(const json& j) {
+    void from_json(const json& j)
+    {
         Stack.from_json(j["Stack"]);
         Input = j["Input"].get<std::string>();
         ErrorMessage = j["ErrorMessage"].get<std::string>();
@@ -585,19 +574,6 @@ bool DrawOneButton(
         }
     }
 
-//    if (inverseMode)
-//    {
-//        ImGui::PushFont(inverseFont);
-//        ImVec2 invPosition = buttonPosition;
-//        invPosition.x += buttonSize.x - ImmApp::EmSize(1.5f);
-//        invPosition.y += buttonSize.y - ImmApp::EmSize(1.f);
-//
-//        ImGui::GetForegroundDrawList()->AddText(
-//            invPosition,
-//            ImGui::GetColorU32(ImGuiCol_Text),
-//            "inv");
-//        ImGui::PopFont();
-//    }
     ImGui::PopStyleColor();
     return pressed;
 }
@@ -608,7 +584,8 @@ bool DrawOneButton(
 std::optional<CalculatorButton> LayoutButtons(AppState& appState)
 {
     ImGui::PushFont(appState.ButtonFont);
-    float calculatorBorderMargin = ImmApp::EmSize(1.f);
+    float calculatorBorderMargin = ImmApp::EmSize(0.5f);
+    ImGui::GetStyle().ItemSpacing = {calculatorBorderMargin, calculatorBorderMargin};
 
     const auto& buttonsRows = appState.CalculatorState.CalculatorLayoutDefinition.Buttons;
 
@@ -658,6 +635,9 @@ std::optional<CalculatorButton> LayoutButtons(AppState& appState)
 void GuiDisplay(AppState& appState)
 {
     const auto& calculatorState = appState.CalculatorState;
+
+    ImGui::Spacing();
+    ImGui::SetCursorPosX(ImGui::GetStyle().ItemSpacing.x);
 
     // Display the stack
     ImGui::PushFont(appState.DisplayFont);
