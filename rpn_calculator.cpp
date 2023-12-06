@@ -365,11 +365,11 @@ namespace RpnCalculator
             double a = Stack.back();
             Stack.pop_back();
             if (cmd == "To Deg")
-                Stack.push_back(a * 180. / 3.1415926535897932384626433832795);
+                Stack.push_back(_toRadian(a) * 180. / 3.1415926535897932384626433832795);
             else if (cmd == "To Rad")
-                Stack.push_back(a * 3.1415926535897932384626433832795 / 180.);
+                Stack.push_back(_toRadian(a));
             else if (cmd == "To Grad")
-                Stack.push_back(a * 200. / 3.1415926535897932384626433832795);
+                Stack.push_back(_toRadian(a) * 200. / 3.1415926535897932384626433832795);
         }
     }
 
