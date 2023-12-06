@@ -1,6 +1,6 @@
 // A Simple RPN calculator application
 #define IMGUI_DEFINE_MATH_OPERATORS
-#include "immapp/immapp.h"
+#include "hello_imgui/hello_imgui.h"
 #include "imgui.h"
 #include "imgui_internal.h"
 
@@ -10,6 +10,7 @@
 #include <vector>
 #include <map>
 #include <optional>
+#include <sstream>
 
 
 using json = nlohmann::json;
@@ -237,14 +238,20 @@ struct CalculatorState
 
         bool success = false;
 
-        try {
-            double v = std::stod(Input);
-            Stack.store_undo();
-            Stack.push_back(v);
-            success = true;
+        {
+            std::istringstream iss(Input);
+            double v;
+            iss >> v;
+
+            if (!iss.fail() && iss.eof())
+            {
+                Stack.store_undo();
+                Stack.push_back(v);
+                success = true;
+            }
+            else
+                ErrorMessage = "Invalid input";
         }
-        catch (std::invalid_argument&) { ErrorMessage = "Invalid number"; }
-        catch (std::out_of_range&) { ErrorMessage = "Out of range"; }
 
         Input = "";
         return success;
@@ -651,7 +658,7 @@ bool DrawIconOnButtonIfFound(const std::string& btnLabel)
     ImVec2 tl = ImGui::GetItemRectMin();
     ImVec2 br = ImGui::GetItemRectMax();
     ImVec2 center = (tl + br) * 0.5f;
-    ImVec2 iconSize = ImmApp::EmToVec2(0.7f, 0.7f);
+    ImVec2 iconSize = HelloImGui::EmToVec2(0.7f, 0.7f);
     if (btnLabel == "<=")
         iconSize = iconSize * 1.5f;
     auto iconTexture = HelloImGui::ImTextureIdFromAsset(btnSpecificIcons.at(btnLabel).c_str());
@@ -745,7 +752,7 @@ bool DrawOneButton(
 std::optional<CalculatorButton> LayoutButtons(AppState& appState)
 {
     ImGui::PushFont(appState.ButtonFont);
-    float calculatorBorderMargin = ImmApp::EmSize(0.5f);
+    float calculatorBorderMargin = HelloImGui::EmSize(0.5f);
     ImGui::GetStyle().ItemSpacing = {calculatorBorderMargin, calculatorBorderMargin};
 
     const auto& buttonsRows = appState.CalculatorState.CalculatorLayoutDefinition.Buttons;
@@ -805,20 +812,20 @@ void GuiDisplay(AppState& appState)
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.f, 0.f, 0.f, 1.f));
     ImGui::SetCursorPos(ImGui::GetStyle().ItemSpacing);
     float childWith = ImGui::GetWindowWidth() - ImGui::GetStyle().ItemSpacing.x * 2.f;
-    if (ImGui::BeginChild("StackDisplay", ImVec2(childWith, 0), ImGuiChildFlags_AutoResizeY))
+    if (ImGui::BeginChild("StackDisplay", ImVec2(childWith, 200.f))) //ImGuiChildFlags_AutoResizeY))
     {
         ImGui::PushFont(appState.MessageFont);
 
         // Display angle unit
         std::string angleUnitStr = (calculatorState.AngleUnit == AngleUnitType::Deg ? "Deg" :
             calculatorState.AngleUnit == AngleUnitType::Rad ? "Rad" : "Grad");
-        ImGui::SameLine((float)(int)(calculatorState.AngleUnit) * ImmApp::EmSize(2.f));
+        ImGui::SameLine((float)(int)(calculatorState.AngleUnit) * HelloImGui::EmSize(2.f));
         ImGui::Text("%s", angleUnitStr.c_str());
 
         // Display Inv indicator on the same line,but at the right
         if (calculatorState.InverseMode)
         {
-            ImGui::SameLine(ImGui::GetWindowWidth() - ImmApp::EmSize(2.f));
+            ImGui::SameLine(ImGui::GetWindowWidth() - HelloImGui::EmSize(2.f));
             ImGui::Text("Inv");
         }
 
@@ -877,14 +884,14 @@ int main(int, char **)
     };
     params.callbacks.PostInit = [&appState]() {
         std::string stateSerialized = HelloImGui::LoadUserPref("CalculatorState");
-        try {
-            auto j = json::parse(stateSerialized);
+        if (stateSerialized.empty())
+            return;
+        auto j  = json::parse(stateSerialized, nullptr, false);
+
+        if (!j.is_null())
             appState.CalculatorState.from_json(j);
-        }
-        catch(std::exception&)
-        {
+        else
             printf("Failed to load calculator state from user pref\n");
-        }
     };
     params.callbacks.BeforeExit = [&appState]() {
         auto j = appState.CalculatorState.to_json();
