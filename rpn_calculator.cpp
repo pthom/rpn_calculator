@@ -378,6 +378,52 @@ namespace RpnCalculator
         InverseMode = !InverseMode;
     }
 
+    // if Input is not empty, add/remove a minus sign, else call the "-" operator
+    void CalculatorState::_onComputerKeyMinus()
+    {
+        if (Input.empty())
+            _onBinaryOperator("-");
+        else
+            _onPlusMinus();
+    }
+
+    void CalculatorState::OnComputerKey(char key)
+    {
+        printf("OnComputerKey: %c\n", key);
+        if (key >= '0' && key <= '9')
+            _onDigit(std::string(1, key));
+        if (key == 'E' || key == 'e')
+            _onDigit("E");
+        else if (key == '.')
+            _onDigit(".");
+        else if (key == '+')
+            _onBinaryOperator("+");
+        else if (key == '-')
+            _onComputerKeyMinus();
+        else if (key == '*')
+            _onBinaryOperator("*");
+        else if (key == '/')
+            _onBinaryOperator("/");
+        else if (key == '\n' || key == '\r')
+            _onEnter();
+        else if (key == '\b') // backspace: remove from input or stack
+        {
+            if (!Input.empty())
+                Input.pop_back(); // Remove last input character
+            else
+            {
+                if (Stack.empty())
+                {
+                    ErrorMessage = "Not enough values on the stack";
+                    return;
+                }
+                Stack.store_undo();
+                Stack.pop_back();
+            }
+        }
+    }
+
+
     void CalculatorState::_onPlusMinus()
     {
         if (Input.empty())
@@ -409,7 +455,7 @@ namespace RpnCalculator
             Input += digit;
     }
 
-    void CalculatorState::OnButton(const CalculatorButton& button)
+    void CalculatorState::OnCalculatorButton(const CalculatorButton& button)
     {
         ErrorMessage = "";
 

@@ -129,8 +129,12 @@ namespace RpnCalculator
         double StoredValue = 0.;
         UndoableNumberStack Stack;
 
-        // callback
-        void OnButton(const CalculatorButton& button);
+        // callbacks
+
+        // callbacks for the UI
+        void OnCalculatorButton(const CalculatorButton& button);
+        // callbacks for the computer keyboard (transmit \b for backspace)
+        void OnComputerKey(char key);
 
         // serialization
         nlohmann::json to_json() const;
@@ -139,16 +143,17 @@ namespace RpnCalculator
     private:
         // private callback helpers
         bool _stackInput();
+        void _onDigit(const std::string& digit);
+        void _onBinaryOperator(const std::string& cmd); // cmd is +, -, *, /, y^x
+        void _onComputerKeyMinus(); // if Input is not empty, add/remove a minus sign, else call the "-" operator
+        void _onBackspace();
         void _onEnter();
         void _onDirectNumber(const std::string& label);
         void _onStackOperator(const std::string& cmd);
-        void _onBinaryOperator(const std::string& cmd);
         void _onUnaryOperator(const std::string& cmd);
-        void _onBackspace();
         void _onDegRadGrad(const std::string& cmd);
         void _onInverse();
         void _onPlusMinus();
-        void _onDigit(const std::string& digit);
 
         // private angle helpers
         double _toRadian(double v) const;

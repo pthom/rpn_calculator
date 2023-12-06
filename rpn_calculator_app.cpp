@@ -2,6 +2,7 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "hello_imgui/hello_imgui.h"
 #include "imgui.h"
+#include "imgui/misc/cpp/imgui_stdlib.h"
 #include "imgui_internal.h"
 #include "rpn_calculator.h"
 
@@ -302,12 +303,73 @@ void GuiDisplay(AppState& appState)
 }
 
 
+
+void HandleComputerKeyboardOld(CalculatorState& calculatorState)
+{
+    // Draw an invisible input text field to capture keyboard input
+    static char buffer[2000] = "";
+
+    // We need to change the InputTextMultiline's id at each user input, in order to be able to reset it
+    // (it seems like ImGui caches values somewhere)
+    static int idx = 0;
+    std::string id = std::string("##hidden_txt") + std::to_string(idx);
+
+    // Make sure the next input text has focus, so it can capture keyboard input
+    // (but do not steal it if the user is mousing)
+    if (!ImGui::IsAnyItemFocused() && !ImGui::IsAnyItemActive())
+        ImGui::SetKeyboardFocusHere();
+    ImVec2 textSize(1.f, 1.f);
+    if (ImGui::InputTextMultiline(id.c_str(), buffer, 256, textSize))
+    {
+        if (strlen(buffer) == 1)
+            calculatorState.OnComputerKey(buffer[0]);
+        // Change the id for the next frame
+        ++idx;
+        // So that ImGui accepts to take into account that the buffer was reset
+        buffer[0] = '\0';
+    }
+
+    if (ImGui::IsKeyPressed(ImGuiKey_Backspace))
+        calculatorState.OnComputerKey('\b');
+}
+
+static int TextEditCallbackStub(ImGuiInputTextCallbackData* data) {
+    // You can store your state object in the `UserData` field of the callback data structure
+    CalculatorState* calculatorState = static_cast<CalculatorState*>(data->UserData);
+    if (data->EventFlag == ImGuiInputTextFlags_CallbackCharFilter)
+    {
+        // This event is triggered for every character input.
+        char c = static_cast<char>(data->EventChar);
+        calculatorState->OnComputerKey(c);
+    }
+    return 0;
+}
+
+void HandleComputerKeyboard(CalculatorState& calculatorState)
+{
+    // Draw an invisible input text field to capture keyboard input
+    static char buffer[2000] = "";
+
+    // Make sure the next input text has focus, so it can capture keyboard input
+    // (but do not steal it if the user is mousing)
+    if (!ImGui::IsAnyItemFocused() && !ImGui::IsAnyItemActive())
+        ImGui::SetKeyboardFocusHere();
+    ImVec2 textSize(1.f, 1.f);
+    ImGui::InputTextMultiline("##hidden_input", buffer, IM_ARRAYSIZE(buffer), textSize,
+                     ImGuiInputTextFlags_CallbackCharFilter, TextEditCallbackStub, &calculatorState);
+
+    if (ImGui::IsKeyPressed(ImGuiKey_Backspace))
+        calculatorState.OnComputerKey('\b');
+
+}
+
 void ShowGui(AppState& appState)
 {
     GuiDisplay(appState);
     auto pressedButton = LayoutButtons(appState);
     if (pressedButton)
-        appState.CalculatorState.OnButton(pressedButton.value());
+        appState.CalculatorState.OnCalculatorButton(pressedButton.value());
+    HandleComputerKeyboard(appState.CalculatorState);
 }
 
 
@@ -329,6 +391,7 @@ int main(int, char **)
     // Serialization
     params.callbacks.PostInit = [&appState]()
     {
+        return;
         std::string stateSerialized = HelloImGui::LoadUserPref("CalculatorState");
         if (stateSerialized.empty())
             return;
