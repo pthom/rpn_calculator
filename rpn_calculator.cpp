@@ -2,6 +2,7 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "immapp/immapp.h"
 #include "imgui.h"
+#include "imgui_internal.h"
 
 #include <deque>
 #include <stack>
@@ -474,21 +475,67 @@ bool DrawOneButton(
 {
     ImVec2 buttonSize =  button.IsDoubleWidth ? doubleButtonSize : standardSize;
     ImVec4 color = ButtonColors[button.Type];
+    if (inverseMode)
+        color = ImVec4(0.6f, 0.4f, 0.4f, 1.f);
     ImGui::PushStyleColor(ImGuiCol_Button, color);
 
-    ImVec2 invPosition = ImGui::GetCursorScreenPos();
-    invPosition.x += buttonSize.x - ImmApp::EmSize(1.f);
+    ImVec2 buttonPosition = ImGui::GetCursorScreenPos();
 
-    bool pressed = ImGui::Button(button.Label.c_str(), buttonSize);
-    if (inverseMode)
+    std::string id = std::string("##") + button.Label;
+    bool pressed = ImGui::Button(id.c_str(), buttonSize);
+
+    // Draw the button label (with possible exponent)
     {
-        ImGui::PushFont(inverseFont);
-        ImGui::GetForegroundDrawList()->AddText(
-            invPosition,
-            ImGui::GetColorU32(ImGuiCol_Text),
-            "inv");
-        ImGui::PopFont();
+        // if the label contains "^" we will need to split in two parts
+        bool isExponent = (button.Label.find('^') != std::string::npos);
+        std::string labelStd, labelExponent;
+        if (!isExponent)
+            labelStd = button.Label;
+        else
+        {
+            labelStd = button.Label.substr(0, button.Label.find('^'));
+            labelExponent = button.Label.substr(button.Label.find('^') + 1);
+        }
+        {
+            ImVec2 sizeStd = ImGui::CalcTextSize(labelStd.c_str());
+            ImGui::PushFont(inverseFont);
+            ImVec2 sizeExponent = ImGui::CalcTextSize(labelExponent.c_str());
+            ImGui::PopFont();
+
+            ImVec2 labelStdPosition(
+                buttonPosition.x + (buttonSize.x - sizeStd.x - sizeExponent.x) * 0.5f,
+                buttonPosition.y + (buttonSize.y - sizeStd.y) * 0.5f);
+            ImGui::GetForegroundDrawList()->AddText(
+                labelStdPosition,
+                ImGui::GetColorU32(ImGuiCol_Text),
+                labelStd.c_str());
+
+            ImVec2 labelExponentPosition(
+                buttonPosition.x + (buttonSize.x - sizeStd.x - sizeExponent.x) * 0.5f + sizeStd.x,
+                buttonPosition.y + (buttonSize.y - sizeStd.y) * 0.5f);
+            ImGui::PushFont(inverseFont);
+            ImGui::GetForegroundDrawList()->AddText(
+                labelExponentPosition,
+                ImGui::GetColorU32(ImGuiCol_Text),
+                labelExponent.c_str());
+            ImGui::PopFont();
+
+        }
     }
+
+//    if (inverseMode)
+//    {
+//        ImGui::PushFont(inverseFont);
+//        ImVec2 invPosition = buttonPosition;
+//        invPosition.x += buttonSize.x - ImmApp::EmSize(1.5f);
+//        invPosition.y += buttonSize.y - ImmApp::EmSize(1.f);
+//
+//        ImGui::GetForegroundDrawList()->AddText(
+//            invPosition,
+//            ImGui::GetColorU32(ImGuiCol_Text),
+//            "inv");
+//        ImGui::PopFont();
+//    }
     ImGui::PopStyleColor();
     return pressed;
 }
