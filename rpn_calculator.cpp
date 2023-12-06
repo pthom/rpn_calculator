@@ -28,7 +28,7 @@ struct CalculatorButton
 {
     std::string Label;
     ButtonType  Type;
-    std::string InverseLabel = "";
+    std::string InverseLabel;
     bool        IsDoubleWidth = false;
 };
 
@@ -131,7 +131,7 @@ struct CalculatorState
     CalculatorLayoutDefinition CalculatorLayoutDefinition;
     AngleUnit AngleUnit = AngleUnit::Deg;
 
-    bool _StackInput()
+    bool _stackInput()
     {
         if (Input.empty())
             return true;
@@ -150,7 +150,7 @@ struct CalculatorState
         return success;
     }
 
-    void _OnDirectNumber(const std::string& label)
+    void _onDirectNumber(const std::string& label)
     {
         if (label == "Pi")
             Input += "3.1415926535897932384626433832795";
@@ -158,7 +158,7 @@ struct CalculatorState
             Input += "2.7182818284590452353602874713527";
     }
 
-    void _OnStackOperator(const std::string& cmd)
+    void _onStackOperator(const std::string& cmd)
     {
         if (cmd == "Swap")
         {
@@ -199,9 +199,9 @@ struct CalculatorState
         }
     }
 
-    void _OnBinaryOperator(const std::string& cmd)
+    void _onBinaryOperator(const std::string& cmd)
     {
-        if (!_StackInput())
+        if (!_stackInput())
             return;
         if (Stack.size() < 2)
         {
@@ -229,7 +229,7 @@ struct CalculatorState
             Stack.push_back(pow(a, b));
     }
 
-    double _ToRadian(double v)
+    [[nodiscard]] double _toRadian(double v) const
     {
         if (AngleUnit == AngleUnit::Deg)
             return v * 3.1415926535897932384626433832795 / 180.;
@@ -239,7 +239,7 @@ struct CalculatorState
             return v;
     }
 
-    double _ToCurrentAngleUnit(double radian)
+    [[nodiscard]] double _toCurrentAngleUnit(double radian) const
     {
         if (AngleUnit == AngleUnit::Deg)
             return radian * 180. / 3.1415926535897932384626433832795;
@@ -249,9 +249,9 @@ struct CalculatorState
             return radian;
     }
 
-    void _OnUnaryOperator(const std::string& cmd)
+    void _onUnaryOperator(const std::string& cmd)
     {
-        if (!_StackInput())
+        if (!_stackInput())
             return;
         if (Stack.empty())
         {
@@ -261,17 +261,17 @@ struct CalculatorState
         double a = Stack.back();
         Stack.pop_back();
         if (cmd == "sin")
-            Stack.push_back(sin(_ToRadian(a)));
+            Stack.push_back(sin(_toRadian(a)));
         else if (cmd == "cos")
-            Stack.push_back(cos(_ToRadian(a)));
+            Stack.push_back(cos(_toRadian(a)));
         else if (cmd == "tan")
-            Stack.push_back(tan(_ToRadian(a)));
+            Stack.push_back(tan(_toRadian(a)));
         else if (cmd == "sin^-1")
-            Stack.push_back(_ToCurrentAngleUnit(asin(a)));
+            Stack.push_back(_toCurrentAngleUnit(asin(a)));
         else if (cmd == "cos^-1")
-            Stack.push_back(_ToCurrentAngleUnit(acos(a)));
+            Stack.push_back(_toCurrentAngleUnit(acos(a)));
         else if (cmd == "tan^-1")
-            Stack.push_back(_ToCurrentAngleUnit(atan(a)));
+            Stack.push_back(_toCurrentAngleUnit(atan(a)));
         else if (cmd == "1/x")
             Stack.push_back(1. / a);
         else if (cmd == "log")
@@ -290,13 +290,13 @@ struct CalculatorState
             Stack.push_back(floor(a));
     }
 
-    void _OnBackspace()
+    void _onBackspace()
     {
         if (!Input.empty())
             Input.pop_back(); // Remove last input character
     }
 
-    void _OnDegRadGrad(const std::string& cmd)
+    void _onDegRadGrad(const std::string& cmd)
     {
         if (cmd == "Deg")
             AngleUnit = AngleUnit::Deg;
@@ -306,7 +306,7 @@ struct CalculatorState
             AngleUnit = AngleUnit::Grad;
     }
 
-    void _OnInverse()
+    void _onInverse()
     {
         InverseMode = !InverseMode;
     }
@@ -318,21 +318,21 @@ struct CalculatorState
         if (button.Type == ButtonType::Digit)
             Input += button.Label;
         else if (button.Type == ButtonType::Backspace)
-            _OnBackspace();
+            _onBackspace();
         else if (button.Type == ButtonType::DirectNumber)
-            _OnDirectNumber(button.Label);
+            _onDirectNumber(button.Label);
         else if (button.Type == ButtonType::Enter)
-            _StackInput();
+            _stackInput();
         else if (button.Type == ButtonType::StackOperator)
-            _OnStackOperator(button.Label);
+            _onStackOperator(button.Label);
         else if (button.Type == ButtonType::BinaryOperator)
-            _OnBinaryOperator(button.Label);
+            _onBinaryOperator(button.Label);
         else if (button.Type == ButtonType::UnaryOperator)
-            _OnUnaryOperator(button.Label);
+            _onUnaryOperator(button.Label);
         else if (button.Type == ButtonType::DegRadGrad)
-            _OnDegRadGrad(button.Label);
+            _onDegRadGrad(button.Label);
         else if (button.Type == ButtonType::Inv)
-            _OnInverse();
+            _onInverse();
     }
 };
 
@@ -358,7 +358,7 @@ std::map<ButtonType, ImVec4> ButtonColors = {
 
 struct AppState
 {
-    ImFont* ButtonFont, *DisplayFont, *MessageFont;
+    ImFont* ButtonFont = nullptr, *DisplayFont = nullptr, *MessageFont = nullptr;
     CalculatorState CalculatorState;
 };
 
@@ -380,6 +380,7 @@ bool DrawOneButton(const CalculatorButton& button, ImVec2 standardSize, ImVec2 d
 // Returns the label of the pressed button
 std::optional<CalculatorButton> LayoutButtons(AppState& appState)
 {
+    ImGui::PushFont(appState.ButtonFont);
     float buttonsBorderMargin = ImmApp::EmSize(1.f);
 
     const auto& buttonsRows = appState.CalculatorState.CalculatorLayoutDefinition.Buttons;
@@ -388,7 +389,7 @@ std::optional<CalculatorButton> LayoutButtons(AppState& appState)
         ImVec2 spacing = ImGui::GetStyle().ItemSpacing;
         ImVec2 totalButtonsSpacing(
             spacing.x * (4.f - 1.f),
-            spacing.y * (buttonsRows.size() - 1.f)
+            spacing.y * ((float)buttonsRows.size() - 1.f)
             );
         float buttonWidth = (ImGui::GetWindowWidth() - totalButtonsSpacing.x - buttonsBorderMargin * 2.f) / 4.f;
         float remainingHeight = ImGui::GetWindowHeight() - ImGui::GetCursorPosY() - totalButtonsSpacing.y - buttonsBorderMargin * 2.f;
@@ -414,6 +415,7 @@ std::optional<CalculatorButton> LayoutButtons(AppState& appState)
         }
         ImGui::NewLine();
     }
+    ImGui::PopFont();
     return pressedButton;
 }
 
@@ -433,7 +435,7 @@ void GuiDisplay(AppState& appState)
         // Display angle unit
         std::string angleUnitStr = (calculatorState.AngleUnit == CalculatorState::AngleUnit::Deg ? "Deg" :
             calculatorState.AngleUnit == CalculatorState::AngleUnit::Rad ? "Rad" : "Grad");
-        ImGui::SameLine(int(calculatorState.AngleUnit) * ImmApp::EmSize(2.f));
+        ImGui::SameLine((float)(int)(calculatorState.AngleUnit) * ImmApp::EmSize(2.f));
         ImGui::Text("%s", angleUnitStr.c_str());
 
         // Display Inv indicator on the same line,but at the right
@@ -447,7 +449,7 @@ void GuiDisplay(AppState& appState)
 
         for (int i = 0; i < nbViewableStackLines; ++i)
         {
-            int stackIndex = calculatorState.Stack.size() - nbViewableStackLines + i;
+            int stackIndex = (int)calculatorState.Stack.size() - nbViewableStackLines + i;
             if (stackIndex < 0)
                 ImGui::Text("");
             else
@@ -485,7 +487,7 @@ void ShowGui(AppState& appState)
 }
 
 
-int main(int argc, char *argv[])
+int main(int, char **)
 {
     AppState appState;
     HelloImGui::RunnerParams params;
