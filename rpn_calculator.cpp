@@ -107,6 +107,7 @@ struct CalculatorLayoutDefinition
          {"Rad", ButtonType::DegRadGrad, "To Rad"},
          {"Grad", ButtonType::DegRadGrad, "To Grad"}},
 
+
         {{"Pi", ButtonType::DirectNumber },
         { "sin", ButtonType::UnaryOperator, "sin^-1" },
         { "cos", ButtonType::UnaryOperator, "cos^-1" },
@@ -123,12 +124,17 @@ struct CalculatorLayoutDefinition
         { "floor", ButtonType::UnaryOperator },
         { "y^x", ButtonType::BinaryOperator }},
 
+        {{"Sto", ButtonType::StackOperator },
+        { "Recall", ButtonType::StackOperator },
+        { "Roll", ButtonType::StackOperator },
+        { "Undo", ButtonType::StackOperator }},
+
         {{"Swap", ButtonType::StackOperator },
         { "Dup", ButtonType::StackOperator },
         { "Drop", ButtonType::StackOperator },
         { "Clear", ButtonType::StackOperator }},
 
-        {{"Enter", ButtonType::Enter, "Undo"},
+        {{"Enter", ButtonType::Enter}, // "Undo"},
         { "E", ButtonType::Digit},
         { "<=", ButtonType::Backspace }},
 
@@ -168,6 +174,7 @@ struct UndoableNumberStack
     double back() const { return Stack.back();}
     double operator[](int index) const { return Stack[index]; }
     void push_back(double v) { Stack.push_back(v); }
+    void push_front(double v) { Stack.push_front(v); }
     void pop_back() { Stack.pop_back(); }
     void clear() { Stack.clear(); }
 
@@ -219,6 +226,7 @@ struct CalculatorState
     std::string Input;
     std::string ErrorMessage;
     bool InverseMode = false;
+    double StoredValue = 0.;
     CalculatorLayoutDefinition CalculatorLayoutDefinition;
     AngleUnitType AngleUnit = AngleUnitType::Deg;
 
@@ -244,10 +252,7 @@ struct CalculatorState
 
     void _onEnter()
     {
-        if (InverseMode)
-            Stack.undo();
-        else
-            (void)_stackInput();
+        (void)_stackInput();
     }
 
     void _onDirectNumber(const std::string& label)
@@ -300,6 +305,49 @@ struct CalculatorState
         {
             Stack.store_undo();
             Stack.clear();
+        }
+        else if (cmd == "Undo")
+        {
+            Stack.undo();
+        }
+        else if (cmd == "Sto")
+        {
+            if (!Input.empty())
+            {
+                if (!_stackInput())
+                {
+                    ErrorMessage = "Invalid number";
+                    return;
+                }
+                StoredValue = Stack.back();
+                Stack.pop_back();
+            }
+            else
+            {
+                if (Stack.empty())
+                {
+                    ErrorMessage = "Not enough values on the stack";
+                    return;
+                }
+                StoredValue = Stack.back();
+            }
+        }
+        else if (cmd == "Recall")
+        {
+            Stack.store_undo();
+            Stack.push_back(StoredValue);
+        }
+        else if (cmd == "Roll")
+        {
+            if (Stack.empty())
+            {
+                ErrorMessage = "Not enough values on the stack";
+                return;
+            }
+            Stack.store_undo();
+            double a = Stack.back();
+            Stack.pop_back();
+            Stack.push_front(a);
         }
     }
 
@@ -439,12 +487,43 @@ struct CalculatorState
         InverseMode = !InverseMode;
     }
 
+    void _onPlusMinus()
+    {
+        if (Input.empty())
+        {
+            if (Stack.empty())
+            {
+                ErrorMessage = "Not enough values on the stack";
+                return;
+            }
+            Stack.store_undo();
+            double a = Stack.back();
+            Stack.pop_back();
+            Stack.push_back(-a);
+        }
+        else
+        {
+            if (Input[0] == '-')
+                Input = Input.substr(1);
+            else
+                Input = "-" + Input;
+        }
+    }
+
+    void _onDigit(const std::string& digit)
+    {
+        if (digit == "+/-")
+            _onPlusMinus();
+        else
+            Input += digit;
+    }
+
     void OnButton(const CalculatorButton& button)
     {
         ErrorMessage = "";
 
         if (button.Type == ButtonType::Digit)
-            Input += button.Label;
+            _onDigit(button.Label);
         else if (button.Type == ButtonType::Backspace)
             _onBackspace();
         else if (button.Type == ButtonType::DirectNumber)
@@ -515,66 +594,148 @@ struct AppState
 };
 
 
+bool ButtonWithGradient(const char*label, ImVec2 buttonSize, ImVec4 color)
+{
+    ImGui::PushStyleColor(ImGuiCol_Button, color);
+    bool pressed = ImGui::Button(label, buttonSize);
+
+    // Draw a gradient on top of the button
+    {
+        ImVec2 tl = ImGui::GetItemRectMin();
+        ImVec2 br = ImGui::GetItemRectMax();
+        ImVec2 size = ImGui::GetItemRectSize();
+
+        float k = 0.3f;
+
+        ImVec2 tl_middle(tl.x, tl.y + size.y * (1.f - k));
+        ImVec2 br_middle(br.x, tl.y + size.y * k);
+
+        ImVec4 col_darker(0.f, 0.f, 0.f, 0.2f);
+        ImVec4 col_interm(0.f, 0.f, 0.f, 0.1f);
+        ImVec4 col_transp(0.f, 0.f, 0.f, 0.f);
+
+        ImGui::GetForegroundDrawList()->AddRectFilledMultiColor(
+            tl,
+            br_middle,
+            ImGui::GetColorU32(col_interm), // upper left
+            ImGui::GetColorU32(col_interm), // upper right
+            ImGui::GetColorU32(col_transp), // bottom right
+            ImGui::GetColorU32(col_transp)  // bottom left
+        );
+        ImGui::GetForegroundDrawList()->AddRectFilledMultiColor(
+            tl_middle,
+            br,
+            ImGui::GetColorU32(col_transp), // upper left
+            ImGui::GetColorU32(col_transp), // upper right
+            ImGui::GetColorU32(col_darker), // bottom right
+            ImGui::GetColorU32(col_darker)  // bottom left
+        );
+
+    }
+    ImGui::PopStyleColor();
+    return pressed;
+}
+
+
+bool DrawIconOnButtonIfFound(const std::string& btnLabel)
+{
+    static std::map<std::string, std::string> btnSpecificIcons{
+        { "Pi", "images/pi100white.png"},
+        { "sqrt", "images/sqrt100white.png"},
+        { "<=", "images/backspace100white.png"}
+    };
+
+    if (btnSpecificIcons.find(btnLabel) == btnSpecificIcons.end())
+        return false;
+
+    ImVec2 tl = ImGui::GetItemRectMin();
+    ImVec2 br = ImGui::GetItemRectMax();
+    ImVec2 center = (tl + br) * 0.5f;
+    ImVec2 iconSize = ImmApp::EmToVec2(0.7f, 0.7f);
+    if (btnLabel == "<=")
+        iconSize = iconSize * 1.5f;
+    auto iconTexture = HelloImGui::ImTextureIdFromAsset(btnSpecificIcons.at(btnLabel).c_str());
+    ImGui::GetForegroundDrawList()->AddImage(
+        iconTexture,
+        center - iconSize * 0.5f,
+        center + iconSize * 0.5f,
+        ImVec2(0.f, 0.f),
+        ImVec2(1.f, 1.f),
+        ImGui::GetColorU32(ImGuiCol_Text)
+    );
+    return true;
+}
+
+
+void DrawKeyLabelOnButton(const std::string& label, ImFont* smallFont)
+{
+    // Draw the button label (with possible exponent)
+
+    // if the label contains "^" we will need to split in two parts
+    bool isExponent = (label.find('^') != std::string::npos);
+    std::string labelStd, labelExponent;
+    if (!isExponent)
+        labelStd = label;
+    else
+    {
+        labelStd = label.substr(0, label.find('^'));
+        labelExponent = label.substr(label.find('^') + 1);
+    }
+    {
+        ImVec2 buttonPosition = ImGui::GetItemRectMin();
+        ImVec2 buttonSize = ImGui::GetItemRectSize();
+
+        ImVec2 sizeStd = ImGui::CalcTextSize(labelStd.c_str());
+        ImGui::PushFont(smallFont);
+        ImVec2 sizeExponent = ImGui::CalcTextSize(labelExponent.c_str());
+        ImGui::PopFont();
+
+        ImVec2 labelStdPosition(
+            buttonPosition.x + (buttonSize.x - sizeStd.x - sizeExponent.x) * 0.5f,
+            buttonPosition.y + (buttonSize.y - sizeStd.y) * 0.5f);
+        ImGui::GetForegroundDrawList()->AddText(
+            labelStdPosition,
+            ImGui::GetColorU32(ImGuiCol_Text),
+            labelStd.c_str());
+
+        ImVec2 labelExponentPosition(
+            buttonPosition.x + (buttonSize.x - sizeStd.x - sizeExponent.x) * 0.5f + sizeStd.x,
+            buttonPosition.y + (buttonSize.y - sizeStd.y) * 0.5f);
+        ImGui::PushFont(smallFont);
+        ImGui::GetForegroundDrawList()->AddText(
+            labelExponentPosition,
+            ImGui::GetColorU32(ImGuiCol_Text),
+            labelExponent.c_str());
+        ImGui::PopFont();
+    }
+}
+
+
 // Draw a button with a size that fits 4 buttons per row and a color based on the button type
 bool DrawOneButton(
     const CalculatorButton& button,
     bool inverseMode,
     ImVec2 standardSize,
     ImVec2 doubleButtonSize,
-    ImFont* inverseFont
+    ImFont* smallFont
     )
 {
     ImVec2 buttonSize =  button.IsDoubleWidth ? doubleButtonSize : standardSize;
     ImVec4 color = ButtonColors[button.Type];
     if (inverseMode)
         color = ImVec4(0.6f, 0.4f, 0.4f, 1.f);
-    ImGui::PushStyleColor(ImGuiCol_Button, color);
 
-    ImVec2 buttonPosition = ImGui::GetCursorScreenPos();
-
+    // Draw the button with an invisible label
     std::string id = std::string("##") + button.Label;
-    bool pressed = ImGui::Button(id.c_str(), buttonSize);
+    bool pressed = ButtonWithGradient(id.c_str(), buttonSize, color);
 
-    // Draw the button label (with possible exponent)
-    {
-        // if the label contains "^" we will need to split in two parts
-        bool isExponent = (button.Label.find('^') != std::string::npos);
-        std::string labelStd, labelExponent;
-        if (!isExponent)
-            labelStd = button.Label;
-        else
-        {
-            labelStd = button.Label.substr(0, button.Label.find('^'));
-            labelExponent = button.Label.substr(button.Label.find('^') + 1);
-        }
-        {
-            ImVec2 sizeStd = ImGui::CalcTextSize(labelStd.c_str());
-            ImGui::PushFont(inverseFont);
-            ImVec2 sizeExponent = ImGui::CalcTextSize(labelExponent.c_str());
-            ImGui::PopFont();
+    // Draw icon if available
+    bool foundIcon = DrawIconOnButtonIfFound(button.Label);
 
-            ImVec2 labelStdPosition(
-                buttonPosition.x + (buttonSize.x - sizeStd.x - sizeExponent.x) * 0.5f,
-                buttonPosition.y + (buttonSize.y - sizeStd.y) * 0.5f);
-            ImGui::GetForegroundDrawList()->AddText(
-                labelStdPosition,
-                ImGui::GetColorU32(ImGuiCol_Text),
-                labelStd.c_str());
+    // Else draw the key label (with possible exponent)
+    if (!foundIcon)
+        DrawKeyLabelOnButton(button.Label, smallFont);
 
-            ImVec2 labelExponentPosition(
-                buttonPosition.x + (buttonSize.x - sizeStd.x - sizeExponent.x) * 0.5f + sizeStd.x,
-                buttonPosition.y + (buttonSize.y - sizeStd.y) * 0.5f);
-            ImGui::PushFont(inverseFont);
-            ImGui::GetForegroundDrawList()->AddText(
-                labelExponentPosition,
-                ImGui::GetColorU32(ImGuiCol_Text),
-                labelExponent.c_str());
-            ImGui::PopFont();
-
-        }
-    }
-
-    ImGui::PopStyleColor();
     return pressed;
 }
 
@@ -636,15 +797,15 @@ void GuiDisplay(AppState& appState)
 {
     const auto& calculatorState = appState.CalculatorState;
 
-    ImGui::Spacing();
-    ImGui::SetCursorPosX(ImGui::GetStyle().ItemSpacing.x);
 
     // Display the stack
     ImGui::PushFont(appState.DisplayFont);
     int nbViewableStackLines = calculatorState.CalculatorLayoutDefinition.DisplayedStackSize;
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.75f, 0.75f, 0.75f, 1.f));
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.f, 0.f, 0.f, 1.f));
-    if (ImGui::BeginChild("StackDisplay", ImVec2(0, 0), ImGuiChildFlags_AutoResizeY))
+    ImGui::SetCursorPos(ImGui::GetStyle().ItemSpacing);
+    float childWith = ImGui::GetWindowWidth() - ImGui::GetStyle().ItemSpacing.x * 2.f;
+    if (ImGui::BeginChild("StackDisplay", ImVec2(childWith, 0), ImGuiChildFlags_AutoResizeY))
     {
         ImGui::PushFont(appState.MessageFont);
 
