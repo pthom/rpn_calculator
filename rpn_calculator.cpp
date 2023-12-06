@@ -61,60 +61,59 @@ struct CalculatorLayoutDefinition
     [0]     [.]      [+/-]    [+]
     ==============================
      */
-    std::vector<CalculatorButton> Buttons = {
-        { "Inv", ButtonType::Inv},
+    std::vector<std::vector<CalculatorButton>> Buttons = {
+        {{"Inv", ButtonType::Inv},
         { "Deg", ButtonType::DegRadGrad},
         { "Rad", ButtonType::DegRadGrad},
-        { "Grad", ButtonType::DegRadGrad},
+        { "Grad", ButtonType::DegRadGrad}},
 
-        { "Pi", ButtonType::DirectNumber },
+        {{"Pi", ButtonType::DirectNumber },
         { "sin", ButtonType::UnaryOperator, "sin^-1" },
         { "cos", ButtonType::UnaryOperator, "cos^-1" },
-        { "tan", ButtonType::UnaryOperator, "tan^-1" },
+        { "tan", ButtonType::UnaryOperator, "tan^-1" }},
 
-        { "1/x", ButtonType::UnaryOperator },
+        {{"1/x", ButtonType::UnaryOperator },
         { "log", ButtonType::UnaryOperator, "10^x" },
         { "ln", ButtonType::UnaryOperator },
-        { "e^x", ButtonType::UnaryOperator },
+        { "e^x", ButtonType::UnaryOperator }},
 
-        { "sqrt", ButtonType::UnaryOperator },
+        {{"sqrt", ButtonType::UnaryOperator },
         { "x^2", ButtonType::UnaryOperator },
         { "floor", ButtonType::UnaryOperator },
-        { "y^x", ButtonType::BinaryOperator },
+        { "y^x", ButtonType::BinaryOperator }},
 
-        { "Swap", ButtonType::StackOperator },
+        {{"Swap", ButtonType::StackOperator },
         { "Dup", ButtonType::StackOperator },
         { "Drop", ButtonType::StackOperator },
-        { "Clear", ButtonType::StackOperator },
+        { "Clear", ButtonType::StackOperator }},
 
-        { "Enter", ButtonType::Enter, "", true},
+        {{"Enter", ButtonType::Enter, "", true},
         { "E", ButtonType::Digit},
-        { "<=", ButtonType::Backspace },
+        { "<=", ButtonType::Backspace }},
 
-        { "7", ButtonType::Digit },
+        {{"7", ButtonType::Digit },
         { "8", ButtonType::Digit },
         { "9", ButtonType::Digit },
-        { "/", ButtonType::BinaryOperator },
+        { "/", ButtonType::BinaryOperator }},
 
-        { "4", ButtonType::Digit },
+        {{"4", ButtonType::Digit },
         { "5", ButtonType::Digit },
         { "6", ButtonType::Digit },
-        { "*", ButtonType::BinaryOperator },
+        { "*", ButtonType::BinaryOperator }},
 
-        { "1", ButtonType::Digit },
+        {{"1", ButtonType::Digit },
         { "2", ButtonType::Digit },
         { "3", ButtonType::Digit },
-        { "-", ButtonType::BinaryOperator },
+        { "-", ButtonType::BinaryOperator }},
 
-        { "0", ButtonType::Digit},
+        {{"0", ButtonType::Digit},
         { ".", ButtonType::Digit },
         { "+/-", ButtonType::Digit },
-        { "+", ButtonType::BinaryOperator },
+        { "+", ButtonType::BinaryOperator }},
     };
 
     int DisplayedStackSize = 4;
     int NbDecimals = 16;
-    int NbButtonsRows = 10;
 };
 
 
@@ -367,7 +366,6 @@ struct AppState
 // Draw a button with a size that fits 4 buttons per row and a color based on the button type
 bool DrawOneButton(const CalculatorButton& button, ImVec2 standardSize, ImVec2 doubleButtonSize)
 {
-
     ImVec2 buttonSize =  button.IsDoubleWidth ? doubleButtonSize : standardSize;
     ImVec4 color = ButtonColors[button.Type];
     ImGui::PushStyleColor(ImGuiCol_Button, color);
@@ -382,14 +380,19 @@ bool DrawOneButton(const CalculatorButton& button, ImVec2 standardSize, ImVec2 d
 // Returns the label of the pressed button
 std::optional<CalculatorButton> LayoutButtons(AppState& appState)
 {
+    float buttonsBorderMargin = ImmApp::EmSize(1.f);
+
+    const auto& buttonsRows = appState.CalculatorState.CalculatorLayoutDefinition.Buttons;
     ImVec2 standardButtonSize, doubleButtonSize;
     {
         ImVec2 spacing = ImGui::GetStyle().ItemSpacing;
-
-        float buttonWidth = (ImGui::GetWindowWidth() - spacing.x * 3.f) / 4.f;
-        float remainingHeight = ImGui::GetWindowHeight() - ImGui::GetCursorPosY();
-        float buttonHeight =
-            remainingHeight / (float)appState.CalculatorState.CalculatorLayoutDefinition.NbButtonsRows - spacing.y;
+        ImVec2 totalButtonsSpacing(
+            spacing.x * (4.f - 1.f),
+            spacing.y * (buttonsRows.size() - 1.f)
+            );
+        float buttonWidth = (ImGui::GetWindowWidth() - totalButtonsSpacing.x - buttonsBorderMargin * 2.f) / 4.f;
+        float remainingHeight = ImGui::GetWindowHeight() - ImGui::GetCursorPosY() - totalButtonsSpacing.y - buttonsBorderMargin * 2.f;
+        float buttonHeight = remainingHeight / (float)buttonsRows.size();
 
         standardButtonSize = ImVec2(buttonWidth, buttonHeight);
         doubleButtonSize = ImVec2(
@@ -399,16 +402,17 @@ std::optional<CalculatorButton> LayoutButtons(AppState& appState)
 
 
     std::optional<CalculatorButton> pressedButton;
-    int xPos = 1;
-    for (const auto& button: appState.CalculatorState.CalculatorLayoutDefinition.Buttons)
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + buttonsBorderMargin);
+    for (const auto& buttonRow: buttonsRows)
     {
-        if (DrawOneButton(button, standardButtonSize, doubleButtonSize))
-            pressedButton = button;
-        xPos += button.IsDoubleWidth ? 2 : 1;
-        if (xPos > 4)
-            xPos = 1;
-        else
+        ImGui::SetCursorPosX(buttonsBorderMargin);
+        for (const auto& button: buttonRow)
+        {
+            if (DrawOneButton(button, standardButtonSize, doubleButtonSize))
+                pressedButton = button;
             ImGui::SameLine();
+        }
+        ImGui::NewLine();
     }
     return pressedButton;
 }
