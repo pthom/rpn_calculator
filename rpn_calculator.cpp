@@ -4,11 +4,15 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 
+#include "nlohmann_json.hpp"
 #include <deque>
 #include <stack>
 #include <vector>
 #include <map>
 #include <optional>
+
+
+using json = nlohmann::json;
 
 
 enum class ButtonType
@@ -185,23 +189,58 @@ struct UndoableNumberStack
         _undoStack.push(Stack);
         Stack.clear();
     }
+
+    // Serialization
+    json to_json() const
+    {
+        json j;
+        j["Stack"] = Stack;
+
+        // Since std::stack doesn't have iterators, we need to temporarily convert it
+        std::vector<std::deque<double>> undoStackVec;
+        std::stack<std::deque<double>> tempUndoStack = _undoStack;
+        while (!tempUndoStack.empty()) {
+            undoStackVec.push_back(tempUndoStack.top());
+            tempUndoStack.pop();
+        }
+        j["_undoStack"] = undoStackVec;
+
+        return j;
+    }
+
+    // Deserialization
+    void from_json(const json& j)
+    {
+        Stack = j["Stack"].get<std::deque<double>>();
+
+        std::vector<std::deque<double>> undoStackVec = j["_undoStack"];
+        for (auto v: undoStackVec)
+            _undoStack.push(v);
+    }
 };
 
 
+enum class AngleUnitType
+{
+    Deg, Rad, Grad
+};
+
+// Helper functions for AngleUnit enum since it's not directly supported by nlohmann/json
+NLOHMANN_JSON_SERIALIZE_ENUM( AngleUnitType, {
+    {AngleUnitType::Deg, "Deg"},
+    {AngleUnitType::Rad, "Rad"},
+    {AngleUnitType::Grad, "Grad"},
+})
+
 struct CalculatorState
 {
-    enum class AngleUnit
-    {
-        Deg, Rad, Grad
-    };
-
     UndoableNumberStack Stack;
 
     std::string Input;
     std::string ErrorMessage;
     bool InverseMode = false;
     CalculatorLayoutDefinition CalculatorLayoutDefinition;
-    AngleUnit AngleUnit = AngleUnit::Deg;
+    AngleUnitType AngleUnit = AngleUnitType::Deg;
 
     bool _stackInput()
     {
@@ -311,9 +350,9 @@ struct CalculatorState
 
     [[nodiscard]] double _toRadian(double v) const
     {
-        if (AngleUnit == AngleUnit::Deg)
+        if (AngleUnit == AngleUnitType::Deg)
             return v * 3.1415926535897932384626433832795 / 180.;
-        else if (AngleUnit == AngleUnit::Grad)
+        else if (AngleUnit == AngleUnitType::Grad)
             return v * 3.1415926535897932384626433832795 / 200.;
         else
             return v;
@@ -321,9 +360,9 @@ struct CalculatorState
 
     [[nodiscard]] double _toCurrentAngleUnit(double radian) const
     {
-        if (AngleUnit == AngleUnit::Deg)
+        if (AngleUnit == AngleUnitType::Deg)
             return radian * 180. / 3.1415926535897932384626433832795;
-        else if (AngleUnit == AngleUnit::Grad)
+        else if (AngleUnit == AngleUnitType::Grad)
             return radian * 200. / 3.1415926535897932384626433832795;
         else
             return radian;
@@ -381,11 +420,11 @@ struct CalculatorState
         if (! InverseMode)
         {
             if (cmd == "Deg")
-                AngleUnit = AngleUnit::Deg;
+                AngleUnit = AngleUnitType::Deg;
             else if (cmd == "Rad")
-                AngleUnit = AngleUnit::Rad;
+                AngleUnit = AngleUnitType::Rad;
             else if (cmd == "Grad")
-                AngleUnit = AngleUnit::Grad;
+                AngleUnit = AngleUnitType::Grad;
         }
         else
         {
@@ -435,7 +474,30 @@ struct CalculatorState
         else if (button.Type == ButtonType::Inv)
             _onInverse();
     }
+
+    // Serialization
+    json to_json() const
+    {
+        json j;
+        j["Stack"] = Stack.to_json();
+        j["Input"] = Input;
+        j["ErrorMessage"] = ErrorMessage;
+        j["InverseMode"] = InverseMode;
+        j["AngleUnit"] = AngleUnit;
+
+        return j;
+    }
+
+    // Deserialization
+    void from_json(const json& j) {
+        Stack.from_json(j["Stack"]);
+        Input = j["Input"].get<std::string>();
+        ErrorMessage = j["ErrorMessage"].get<std::string>();
+        InverseMode = j["InverseMode"].get<bool>();
+        AngleUnit = j["AngleUnit"].get<AngleUnitType>();
+    }
 };
+
 
 
 
@@ -607,8 +669,8 @@ void GuiDisplay(AppState& appState)
         ImGui::PushFont(appState.MessageFont);
 
         // Display angle unit
-        std::string angleUnitStr = (calculatorState.AngleUnit == CalculatorState::AngleUnit::Deg ? "Deg" :
-            calculatorState.AngleUnit == CalculatorState::AngleUnit::Rad ? "Rad" : "Grad");
+        std::string angleUnitStr = (calculatorState.AngleUnit == AngleUnitType::Deg ? "Deg" :
+            calculatorState.AngleUnit == AngleUnitType::Rad ? "Rad" : "Grad");
         ImGui::SameLine((float)(int)(calculatorState.AngleUnit) * ImmApp::EmSize(2.f));
         ImGui::Text("%s", angleUnitStr.c_str());
 
@@ -671,6 +733,22 @@ int main(int, char **)
         appState.ButtonFont = HelloImGui::LoadFontTTF("fonts/Roboto/Roboto-Bold.ttf", 18.f);
         appState.MessageFont = HelloImGui::LoadFontTTF("fonts/Roboto/Roboto-Bold.ttf", 12.f);
         appState.DisplayFont = HelloImGui::LoadFontTTF("fonts/scientific-calculator-lcd-font/ScientificCalculatorLcdRegular-Kn7X.ttf", 15.f);
+    };
+    params.callbacks.PostInit = [&appState]() {
+        std::string stateSerialized = HelloImGui::LoadUserPref("CalculatorState");
+        try {
+            auto j = json::parse(stateSerialized);
+            appState.CalculatorState.from_json(j);
+        }
+        catch(std::exception&)
+        {
+            printf("Failed to load calculator state from user pref\n");
+        }
+    };
+    params.callbacks.BeforeExit = [&appState]() {
+        auto j = appState.CalculatorState.to_json();
+        std::string stateSerialized = j.dump();
+        HelloImGui::SaveUserPref("CalculatorState", stateSerialized);
     };
 
     HelloImGui::Run(params);
