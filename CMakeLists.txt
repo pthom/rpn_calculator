@@ -14,6 +14,10 @@ if (NOT TARGET hello_imgui)
     FetchContent_MakeAvailable(hello_imgui)
 endif()
 
-hello_imgui_add_app(rpn_calculator rpn_calculator.cpp)
+hello_imgui_add_app(rpn_calculator
+    rpn_calculator.cpp
+    rpn_calculator.h
+    rpn_calculator_app.cpp
+)
 target_compile_options(rpn_calculator PUBLIC -fsanitize=address)
 target_link_options(rpn_calculator PUBLIC -fsanitize=address)

@@ -1,62 +1,76 @@
-// A Simple RPN calculator application
-#define IMGUI_DEFINE_MATH_OPERATORS
-#include "hello_imgui/hello_imgui.h"
-#include "imgui.h"
-#include "imgui_internal.h"
-
-#include "nlohmann_json.hpp"
-#include <deque>
-#include <stack>
-#include <vector>
-#include <map>
-#include <optional>
-#include <sstream>
+#include "rpn_calculator.h"
 
 
-using json = nlohmann::json;
-
-
-enum class ButtonType
+namespace RpnCalculator
 {
-    Digit,            // 0-9
-    DirectNumber,     // Pi, e
-    Backspace,        // <=
-
-    BinaryOperator,   // +, -, *
-    UnaryOperator,    // sin, cos, tan, log, ln, sqrt, x^2, floor
-    StackOperator,    // Swap, Dup, Drop, Clear
-
-    Inv,            // Inverse
-    DegRadGrad,     // Degree, Radian, Gradian
-    Enter           // Enter
-};
-
-
-struct CalculatorButton
-{
-    std::string Label;
-    ButtonType  Type = ButtonType::Digit;
-    bool        IsDoubleWidth = false;
-};
-
-struct CalculatorButtonWithInverse
-{
-    CalculatorButton Button;
-    std::optional<CalculatorButton> InverseButton = std::nullopt;
-
-    [[nodiscard]] const CalculatorButton& GetCurrentButton(bool inverseMode) const
+    CalculatorLayoutDefinition::CalculatorLayoutDefinition()
     {
-        if (inverseMode && InverseButton.has_value())
-            return InverseButton.value();
-        else
-            return Button;
+        Buttons = {
+            {   { "Inv", ButtonType::Inv},
+                { "Deg", ButtonType::DegRadGrad, "To Deg"},
+                { "Rad", ButtonType::DegRadGrad, "To Rad"},
+                { "Grad", ButtonType::DegRadGrad, "To Grad"}},
+
+
+            {   { "Pi", ButtonType::DirectNumber },
+                { "sin", ButtonType::UnaryOperator, "sin^-1" },
+                { "cos", ButtonType::UnaryOperator, "cos^-1" },
+                { "tan", ButtonType::UnaryOperator, "tan^-1" }},
+
+
+            {   { "1/x", ButtonType::UnaryOperator },
+                { "log", ButtonType::UnaryOperator, "10^x" },
+                { "ln", ButtonType::UnaryOperator },
+                { "e^x", ButtonType::UnaryOperator }},
+
+            {   { "sqrt", ButtonType::UnaryOperator },
+                { "x^2", ButtonType::UnaryOperator },
+                { "floor", ButtonType::UnaryOperator },
+                { "y^x", ButtonType::BinaryOperator }},
+
+            {   { "Sto", ButtonType::StackOperator },
+                { "Recall", ButtonType::StackOperator },
+                { "Roll", ButtonType::StackOperator },
+                { "Undo", ButtonType::StackOperator }},
+
+            {   { "Swap", ButtonType::StackOperator },
+                { "Dup", ButtonType::StackOperator },
+                { "Drop", ButtonType::StackOperator },
+                { "Clear", ButtonType::StackOperator }},
+
+            {   { "Enter", ButtonType::Enter}, // "Undo"},
+                { "E", ButtonType::Digit},
+                { "<=", ButtonType::Backspace }},
+
+            {   { "7", ButtonType::Digit },
+                { "8", ButtonType::Digit },
+                { "9", ButtonType::Digit },
+                { "/", ButtonType::BinaryOperator }},
+
+            {   { "4", ButtonType::Digit },
+                { "5", ButtonType::Digit },
+                { "6", ButtonType::Digit },
+                { "*", ButtonType::BinaryOperator }},
+
+            {   { "1", ButtonType::Digit },
+                { "2", ButtonType::Digit },
+                { "3", ButtonType::Digit },
+                { "-", ButtonType::BinaryOperator }},
+
+            {   { "0", ButtonType::Digit},
+                { ".", ButtonType::Digit },
+                { "+/-", ButtonType::Digit },
+                { "+", ButtonType::BinaryOperator }},
+        };
     }
 
-    CalculatorButtonWithInverse(
+
+
+    CalculatorButtonWithInverse::CalculatorButtonWithInverse(
         const std::string& label,
         ButtonType type,
-        const std::string& inverseLabel = "",
-        std::optional<ButtonType> inverseType = std::nullopt)
+        const std::string& inverseLabel,
+        std::optional<ButtonType> inverseType)
     {
         Button.Label = label;
         Button.Type = type;
@@ -70,168 +84,38 @@ struct CalculatorButtonWithInverse
             InverseButton->IsDoubleWidth = Button.IsDoubleWidth;
         }
     }
-};
 
-
-
-struct CalculatorLayoutDefinition
-{
-    /*
-    Here is how the calculator looks like:
-        * each button row has 4 buttons
-        * Enter is a special button that is double width
-        * The stack and error indicator is displayed on top
-    ==============================
-                        stack N-3
-                        stack N-2
-                        stack N-1
-                          stack N
-    user input
-                   error indicator
-    ==============================
-    [Inv]   [Deg]   [Rad]   [Grad]
-    [Pi]    [sin]   [cos]   [tan]
-    [1/x]   [log]   [ln]    [e^x]
-    [sqrt]  [x^2]   [floor] [y^x]
-    ==============================
-    [Swap]  [Dup]    [Drop] [Clear]
-    [   Enter ]      [E]      [<=]
-    [7]     [8]      [9]      [/]
-    [4]     [5]      [6]      [*]
-    [1]     [2]      [3]      [-]
-    [0]     [.]      [+/-]    [+]
-    ==============================
-     */
-    std::vector<std::vector<CalculatorButtonWithInverse>> Buttons = {
-        {{"Inv", ButtonType::Inv},
-         {"Deg", ButtonType::DegRadGrad, "To Deg"},
-         {"Rad", ButtonType::DegRadGrad, "To Rad"},
-         {"Grad", ButtonType::DegRadGrad, "To Grad"}},
-
-
-        {{"Pi", ButtonType::DirectNumber },
-        { "sin", ButtonType::UnaryOperator, "sin^-1" },
-        { "cos", ButtonType::UnaryOperator, "cos^-1" },
-        { "tan", ButtonType::UnaryOperator, "tan^-1" }},
-
-
-        {{"1/x", ButtonType::UnaryOperator },
-        { "log", ButtonType::UnaryOperator, "10^x" },
-        { "ln", ButtonType::UnaryOperator },
-        { "e^x", ButtonType::UnaryOperator }},
-
-        {{"sqrt", ButtonType::UnaryOperator },
-        { "x^2", ButtonType::UnaryOperator },
-        { "floor", ButtonType::UnaryOperator },
-        { "y^x", ButtonType::BinaryOperator }},
-
-        {{"Sto", ButtonType::StackOperator },
-        { "Recall", ButtonType::StackOperator },
-        { "Roll", ButtonType::StackOperator },
-        { "Undo", ButtonType::StackOperator }},
-
-        {{"Swap", ButtonType::StackOperator },
-        { "Dup", ButtonType::StackOperator },
-        { "Drop", ButtonType::StackOperator },
-        { "Clear", ButtonType::StackOperator }},
-
-        {{"Enter", ButtonType::Enter}, // "Undo"},
-        { "E", ButtonType::Digit},
-        { "<=", ButtonType::Backspace }},
-
-        {{"7", ButtonType::Digit },
-        { "8", ButtonType::Digit },
-        { "9", ButtonType::Digit },
-        { "/", ButtonType::BinaryOperator }},
-
-        {{"4", ButtonType::Digit },
-        { "5", ButtonType::Digit },
-        { "6", ButtonType::Digit },
-        { "*", ButtonType::BinaryOperator }},
-
-        {{"1", ButtonType::Digit },
-        { "2", ButtonType::Digit },
-        { "3", ButtonType::Digit },
-        { "-", ButtonType::BinaryOperator }},
-
-        {{"0", ButtonType::Digit},
-        { ".", ButtonType::Digit },
-        { "+/-", ButtonType::Digit },
-        { "+", ButtonType::BinaryOperator }},
-    };
-
-    int DisplayedStackSize = 4;
-    int NbDecimals = 12;
-};
-
-
-struct UndoableNumberStack
-{
-    std::deque<double> Stack;
-    std::stack<std::deque<double>> _undoStack;
-
-    size_t size() const { return Stack.size(); }
-    bool empty() const { return Stack.empty(); }
-    double back() const { return Stack.back();}
-    double operator[](int index) const { return Stack[index]; }
-    void push_back(double v) { Stack.push_back(v); }
-    void push_front(double v) { Stack.push_front(v); }
-    void pop_back() { Stack.pop_back(); }
-    void clear() { Stack.clear(); }
-
-    void undo()
+    const CalculatorButton& CalculatorButtonWithInverse::GetCurrentButton(bool inverseMode) const
     {
-        if (_undoStack.empty())
-            return;
-        Stack = _undoStack.top();
-        _undoStack.pop();
+        if (inverseMode && InverseButton.has_value())
+        return InverseButton.value();
+        else
+        return Button;
     }
 
-    void store_undo()
-    {
-        _undoStack.push(Stack);
+    std::string to_string(AngleUnitType t) {
+        switch (t) {
+            case AngleUnitType::Deg: return "Deg";
+            case AngleUnitType::Rad: return "Rad";
+            case AngleUnitType::Grad: return "Grad";
+        }
+        return "";
     }
 
-    // Serialization
-    json to_json() const
-    {
-        json j;
-        j["Stack"] = Stack;
-        return j;
-    }
-
-    // Deserialization
-    void from_json(const json& j)
-    {
-        Stack = j["Stack"].get<std::deque<double>>();
-    }
-};
-
-
-enum class AngleUnitType
-{
-    Deg, Rad, Grad
-};
 
 // Helper functions for AngleUnit enum since it's not directly supported by nlohmann/json
-NLOHMANN_JSON_SERIALIZE_ENUM( AngleUnitType, {
-    {AngleUnitType::Deg, "Deg"},
-    {AngleUnitType::Rad, "Rad"},
-    {AngleUnitType::Grad, "Grad"},
-})
+    NLOHMANN_JSON_SERIALIZE_ENUM( AngleUnitType, {
+        {AngleUnitType::Deg, "Deg"},
+        {AngleUnitType::Rad, "Rad"},
+        {AngleUnitType::Grad, "Grad"},
+    })
 
-struct CalculatorState
-{
-    UndoableNumberStack Stack;
 
-    std::string Input;
-    std::string ErrorMessage;
-    bool InverseMode = false;
-    double StoredValue = 0.;
-    CalculatorLayoutDefinition CalculatorLayoutDefinition;
-    AngleUnitType AngleUnit = AngleUnitType::Deg;
+    //
+    //  CalculatorState implementation
+    //
 
-    bool _stackInput()
+    bool CalculatorState::_stackInput()
     {
         if (Input.empty())
             return true;
@@ -257,12 +141,12 @@ struct CalculatorState
         return success;
     }
 
-    void _onEnter()
+    void CalculatorState::_onEnter()
     {
         (void)_stackInput();
     }
 
-    void _onDirectNumber(const std::string& label)
+    void CalculatorState::_onDirectNumber(const std::string& label)
     {
         if (label == "Pi")
             Input += "3.1415926535897932384626433832795";
@@ -270,7 +154,7 @@ struct CalculatorState
             Input += "2.7182818284590452353602874713527";
     }
 
-    void _onStackOperator(const std::string& cmd)
+    void CalculatorState::_onStackOperator(const std::string& cmd)
     {
         if (cmd == "Swap")
         {
@@ -358,7 +242,7 @@ struct CalculatorState
         }
     }
 
-    void _onBinaryOperator(const std::string& cmd)
+    void CalculatorState::_onBinaryOperator(const std::string& cmd)
     {
         if (!_stackInput())
             return;
@@ -389,7 +273,7 @@ struct CalculatorState
             Stack.push_back(pow(a, b));
     }
 
-    [[nodiscard]] double _toRadian(double v) const
+    double CalculatorState::_toRadian(double v) const
     {
         if (AngleUnit == AngleUnitType::Deg)
             return v * 3.1415926535897932384626433832795 / 180.;
@@ -399,7 +283,7 @@ struct CalculatorState
             return v;
     }
 
-    [[nodiscard]] double _toCurrentAngleUnit(double radian) const
+    double CalculatorState::_toCurrentAngleUnit(double radian) const
     {
         if (AngleUnit == AngleUnitType::Deg)
             return radian * 180. / 3.1415926535897932384626433832795;
@@ -409,7 +293,7 @@ struct CalculatorState
             return radian;
     }
 
-    void _onUnaryOperator(const std::string& cmd)
+    void CalculatorState::_onUnaryOperator(const std::string& cmd)
     {
         if (!_stackInput())
             return;
@@ -451,13 +335,13 @@ struct CalculatorState
             Stack.push_back(floor(a));
     }
 
-    void _onBackspace()
+    void CalculatorState::_onBackspace()
     {
         if (!Input.empty())
             Input.pop_back(); // Remove last input character
     }
 
-    void _onDegRadGrad(const std::string& cmd)
+    void CalculatorState::_onDegRadGrad(const std::string& cmd)
     {
         if (! InverseMode)
         {
@@ -489,12 +373,12 @@ struct CalculatorState
         }
     }
 
-    void _onInverse()
+    void CalculatorState::_onInverse()
     {
         InverseMode = !InverseMode;
     }
 
-    void _onPlusMinus()
+    void CalculatorState::_onPlusMinus()
     {
         if (Input.empty())
         {
@@ -517,7 +401,7 @@ struct CalculatorState
         }
     }
 
-    void _onDigit(const std::string& digit)
+    void CalculatorState::_onDigit(const std::string& digit)
     {
         if (digit == "+/-")
             _onPlusMinus();
@@ -525,7 +409,7 @@ struct CalculatorState
             Input += digit;
     }
 
-    void OnButton(const CalculatorButton& button)
+    void CalculatorState::OnButton(const CalculatorButton& button)
     {
         ErrorMessage = "";
 
@@ -550,9 +434,9 @@ struct CalculatorState
     }
 
     // Serialization
-    json to_json() const
+    nlohmann::json CalculatorState::to_json() const
     {
-        json j;
+        nlohmann::json j;
         j["Stack"] = Stack.to_json();
         j["Input"] = Input;
         j["ErrorMessage"] = ErrorMessage;
@@ -563,7 +447,7 @@ struct CalculatorState
     }
 
     // Deserialization
-    void from_json(const json& j)
+    void CalculatorState::from_json(const nlohmann::json& j)
     {
         Stack.from_json(j["Stack"]);
         Input = j["Input"].get<std::string>();
@@ -571,334 +455,5 @@ struct CalculatorState
         InverseMode = j["InverseMode"].get<bool>();
         AngleUnit = j["AngleUnit"].get<AngleUnitType>();
     }
-};
 
-
-
-
-///////  GUI  Below ///////
-
-
-std::map<ButtonType, ImVec4> ButtonColors = {
-    { ButtonType::Digit, { 0.5f, 0.5f, 0.5f, 1.0f } },
-    { ButtonType::DirectNumber, { 0.6f, 0.6f, 0.6f, 1.0f } },
-    { ButtonType::Backspace, { 0.65f, 0.65f, 0.65f, 1.0f } },
-
-    { ButtonType::BinaryOperator, { 0.2f, 0.2f, 0.8f, 1.0f } },
-    { ButtonType::UnaryOperator, { 0.4f, 0.4f, 0.8f, 1.0f } },
-    { ButtonType::StackOperator, { 0.4f, 0.3f, 0.3f, 1.0f } },
-    { ButtonType::Inv, { 0.8f, 0.6f, 0.0f, 1.0f } },
-    { ButtonType::DegRadGrad, { 0.6f, 0.6f, 0.0f, 1.0f } },
-    { ButtonType::Enter, { 0.0f, 0.7f, 0.0f, 1.0f } },
-};
-
-
-
-struct AppState
-{
-    ImFont* ButtonFont = nullptr, *DisplayFont = nullptr, *MessageFont = nullptr;
-    CalculatorState CalculatorState;
-};
-
-
-bool ButtonWithGradient(const char*label, ImVec2 buttonSize, ImVec4 color)
-{
-    ImGui::PushStyleColor(ImGuiCol_Button, color);
-    bool pressed = ImGui::Button(label, buttonSize);
-
-    // Draw a gradient on top of the button
-    {
-        ImVec2 tl = ImGui::GetItemRectMin();
-        ImVec2 br = ImGui::GetItemRectMax();
-        ImVec2 size = ImGui::GetItemRectSize();
-
-        float k = 0.3f;
-
-        ImVec2 tl_middle(tl.x, tl.y + size.y * (1.f - k));
-        ImVec2 br_middle(br.x, tl.y + size.y * k);
-
-        ImVec4 col_darker(0.f, 0.f, 0.f, 0.2f);
-        ImVec4 col_interm(0.f, 0.f, 0.f, 0.1f);
-        ImVec4 col_transp(0.f, 0.f, 0.f, 0.f);
-
-        ImGui::GetForegroundDrawList()->AddRectFilledMultiColor(
-            tl,
-            br_middle,
-            ImGui::GetColorU32(col_interm), // upper left
-            ImGui::GetColorU32(col_interm), // upper right
-            ImGui::GetColorU32(col_transp), // bottom right
-            ImGui::GetColorU32(col_transp)  // bottom left
-        );
-        ImGui::GetForegroundDrawList()->AddRectFilledMultiColor(
-            tl_middle,
-            br,
-            ImGui::GetColorU32(col_transp), // upper left
-            ImGui::GetColorU32(col_transp), // upper right
-            ImGui::GetColorU32(col_darker), // bottom right
-            ImGui::GetColorU32(col_darker)  // bottom left
-        );
-
-    }
-    ImGui::PopStyleColor();
-    return pressed;
-}
-
-
-bool DrawIconOnButtonIfFound(const std::string& btnLabel)
-{
-    static std::map<std::string, std::string> btnSpecificIcons{
-        { "Pi", "images/pi100white.png"},
-        { "sqrt", "images/sqrt100white.png"},
-        { "<=", "images/backspace100white.png"}
-    };
-
-    if (btnSpecificIcons.find(btnLabel) == btnSpecificIcons.end())
-        return false;
-
-    ImVec2 tl = ImGui::GetItemRectMin();
-    ImVec2 br = ImGui::GetItemRectMax();
-    ImVec2 center = (tl + br) * 0.5f;
-    ImVec2 iconSize = HelloImGui::EmToVec2(0.7f, 0.7f);
-    if (btnLabel == "<=")
-        iconSize = iconSize * 1.5f;
-    auto iconTexture = HelloImGui::ImTextureIdFromAsset(btnSpecificIcons.at(btnLabel).c_str());
-    ImGui::GetForegroundDrawList()->AddImage(
-        iconTexture,
-        center - iconSize * 0.5f,
-        center + iconSize * 0.5f,
-        ImVec2(0.f, 0.f),
-        ImVec2(1.f, 1.f),
-        ImGui::GetColorU32(ImGuiCol_Text)
-    );
-    return true;
-}
-
-
-void DrawKeyLabelOnButton(const std::string& label, ImFont* smallFont)
-{
-    // Draw the button label (with possible exponent)
-
-    // if the label contains "^" we will need to split in two parts
-    bool isExponent = (label.find('^') != std::string::npos);
-    std::string labelStd, labelExponent;
-    if (!isExponent)
-        labelStd = label;
-    else
-    {
-        labelStd = label.substr(0, label.find('^'));
-        labelExponent = label.substr(label.find('^') + 1);
-    }
-    {
-        ImVec2 buttonPosition = ImGui::GetItemRectMin();
-        ImVec2 buttonSize = ImGui::GetItemRectSize();
-
-        ImVec2 sizeStd = ImGui::CalcTextSize(labelStd.c_str());
-        ImGui::PushFont(smallFont);
-        ImVec2 sizeExponent = ImGui::CalcTextSize(labelExponent.c_str());
-        ImGui::PopFont();
-
-        ImVec2 labelStdPosition(
-            buttonPosition.x + (buttonSize.x - sizeStd.x - sizeExponent.x) * 0.5f,
-            buttonPosition.y + (buttonSize.y - sizeStd.y) * 0.5f);
-        ImGui::GetForegroundDrawList()->AddText(
-            labelStdPosition,
-            ImGui::GetColorU32(ImGuiCol_Text),
-            labelStd.c_str());
-
-        ImVec2 labelExponentPosition(
-            buttonPosition.x + (buttonSize.x - sizeStd.x - sizeExponent.x) * 0.5f + sizeStd.x,
-            buttonPosition.y + (buttonSize.y - sizeStd.y) * 0.5f);
-        ImGui::PushFont(smallFont);
-        ImGui::GetForegroundDrawList()->AddText(
-            labelExponentPosition,
-            ImGui::GetColorU32(ImGuiCol_Text),
-            labelExponent.c_str());
-        ImGui::PopFont();
-    }
-}
-
-
-// Draw a button with a size that fits 4 buttons per row and a color based on the button type
-bool DrawOneButton(
-    const CalculatorButton& button,
-    bool inverseMode,
-    ImVec2 standardSize,
-    ImVec2 doubleButtonSize,
-    ImFont* smallFont
-    )
-{
-    ImVec2 buttonSize =  button.IsDoubleWidth ? doubleButtonSize : standardSize;
-    ImVec4 color = ButtonColors[button.Type];
-    if (inverseMode)
-        color = ImVec4(0.6f, 0.4f, 0.4f, 1.f);
-
-    // Draw the button with an invisible label
-    std::string id = std::string("##") + button.Label;
-    bool pressed = ButtonWithGradient(id.c_str(), buttonSize, color);
-
-    // Draw icon if available
-    bool foundIcon = DrawIconOnButtonIfFound(button.Label);
-
-    // Else draw the key label (with possible exponent)
-    if (!foundIcon)
-        DrawKeyLabelOnButton(button.Label, smallFont);
-
-    return pressed;
-}
-
-
-// Layout 4 buttons per row (with possible double width)
-// Returns the pressed button
-std::optional<CalculatorButton> LayoutButtons(AppState& appState)
-{
-    ImGui::PushFont(appState.ButtonFont);
-    float calculatorBorderMargin = HelloImGui::EmSize(0.5f);
-    ImGui::GetStyle().ItemSpacing = {calculatorBorderMargin, calculatorBorderMargin};
-
-    const auto& buttonsRows = appState.CalculatorState.CalculatorLayoutDefinition.Buttons;
-
-    // Calculate buttons size so that they fit the remaining space
-    ImVec2 standardButtonSize, doubleButtonSize;
-    {
-        ImVec2 spacing = ImGui::GetStyle().ItemSpacing;
-        ImVec2 totalButtonsSpacing(
-            spacing.x * (4.f - 1.f),
-            spacing.y * ((float)buttonsRows.size() - 1.f)
-            );
-
-        float buttonWidth = (ImGui::GetWindowWidth() - totalButtonsSpacing.x - calculatorBorderMargin * 2.f) / 4.f;
-
-        float remainingHeight =
-            ImGui::GetWindowHeight()
-            - ImGui::GetCursorPosY()
-            - totalButtonsSpacing.y
-            - calculatorBorderMargin * 2.f;
-        float buttonHeight = remainingHeight / (float)buttonsRows.size();
-
-        standardButtonSize = ImVec2(buttonWidth, buttonHeight);
-        doubleButtonSize = ImVec2(
-            standardButtonSize.x * 2 + ImGui::GetStyle().ItemSpacing.x,
-            standardButtonSize.y);
-    }
-
-    std::optional<CalculatorButton> pressedButton;
-    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + calculatorBorderMargin);
-    for (const auto& buttonRow: buttonsRows)
-    {
-        ImGui::SetCursorPosX(calculatorBorderMargin);
-        for (const auto& buttonWithInverse: buttonRow)
-        {
-            bool inverseMode = appState.CalculatorState.InverseMode && buttonWithInverse.InverseButton.has_value();
-            const CalculatorButton& button = buttonWithInverse.GetCurrentButton(inverseMode);
-            if (DrawOneButton(button, inverseMode, standardButtonSize, doubleButtonSize, appState.MessageFont))
-                pressedButton = button;
-            ImGui::SameLine();
-        }
-        ImGui::NewLine();
-    }
-    ImGui::PopFont();
-    return pressedButton;
-}
-
-void GuiDisplay(AppState& appState)
-{
-    const auto& calculatorState = appState.CalculatorState;
-
-
-    // Display the stack
-    ImGui::PushFont(appState.DisplayFont);
-    int nbViewableStackLines = calculatorState.CalculatorLayoutDefinition.DisplayedStackSize;
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.75f, 0.75f, 0.75f, 1.f));
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.f, 0.f, 0.f, 1.f));
-    ImGui::SetCursorPos(ImGui::GetStyle().ItemSpacing);
-    float childWith = ImGui::GetWindowWidth() - ImGui::GetStyle().ItemSpacing.x * 2.f;
-    if (ImGui::BeginChild("StackDisplay", ImVec2(childWith, 200.f))) //ImGuiChildFlags_AutoResizeY))
-    {
-        ImGui::PushFont(appState.MessageFont);
-
-        // Display angle unit
-        std::string angleUnitStr = (calculatorState.AngleUnit == AngleUnitType::Deg ? "Deg" :
-            calculatorState.AngleUnit == AngleUnitType::Rad ? "Rad" : "Grad");
-        ImGui::SameLine((float)(int)(calculatorState.AngleUnit) * HelloImGui::EmSize(2.f));
-        ImGui::Text("%s", angleUnitStr.c_str());
-
-        // Display Inv indicator on the same line,but at the right
-        if (calculatorState.InverseMode)
-        {
-            ImGui::SameLine(ImGui::GetWindowWidth() - HelloImGui::EmSize(2.f));
-            ImGui::Text("Inv");
-        }
-
-        ImGui::PopFont();
-
-        for (int i = 0; i < nbViewableStackLines; ++i)
-        {
-            int stackIndex = (int)calculatorState.Stack.size() - nbViewableStackLines + i;
-            if (stackIndex < 0)
-                ImGui::Text("");
-            else
-            {
-                ImGui::Text("%i:", nbViewableStackLines - i);
-                // Display the stack value at the right of the screen
-                // Convert value to string with a fixed number of decimals
-                int nbDecimals = calculatorState.CalculatorLayoutDefinition.NbDecimals;
-                char valueAsString[64];
-                snprintf(valueAsString, 64, "%.*G", nbDecimals, calculatorState.Stack[stackIndex]);
-                ImVec2 textSize = ImGui::CalcTextSize(valueAsString);
-                ImGui::SameLine(ImGui::GetWindowWidth() - textSize.x);
-                ImGui::Text("%s", valueAsString);
-            }
-        }
-        ImGui::Text("%s", calculatorState.Input.c_str());
-        ImGui::PopFont();
-
-        ImGui::PushFont(appState.MessageFont);
-        ImGui::Text("%s", calculatorState.ErrorMessage.c_str());
-        ImGui::PopFont();
-
-        ImGui::PopStyleColor(2);
-        ImGui::EndChild();
-    }
-}
-
-
-void ShowGui(AppState& appState)
-{
-    GuiDisplay(appState);
-    auto pressedButton = LayoutButtons(appState);
-    if (pressedButton)
-        appState.CalculatorState.OnButton(pressedButton.value());
-}
-
-
-int main(int, char **)
-{
-    AppState appState;
-    HelloImGui::RunnerParams params;
-    params.appWindowParams.windowGeometry.size = { 350, 600 };
-    params.callbacks.ShowGui = [&appState]() {  ShowGui(appState); };
-    params.callbacks.LoadAdditionalFonts = [&appState]() {
-        appState.ButtonFont = HelloImGui::LoadFontTTF("fonts/Roboto/Roboto-Bold.ttf", 18.f);
-        appState.MessageFont = HelloImGui::LoadFontTTF("fonts/Roboto/Roboto-Bold.ttf", 12.f);
-        appState.DisplayFont = HelloImGui::LoadFontTTF("fonts/scientific-calculator-lcd-font/ScientificCalculatorLcdRegular-Kn7X.ttf", 15.f);
-    };
-    params.callbacks.PostInit = [&appState]() {
-        std::string stateSerialized = HelloImGui::LoadUserPref("CalculatorState");
-        if (stateSerialized.empty())
-            return;
-        auto j  = json::parse(stateSerialized, nullptr, false);
-
-        if (!j.is_null())
-            appState.CalculatorState.from_json(j);
-        else
-            printf("Failed to load calculator state from user pref\n");
-    };
-    params.callbacks.BeforeExit = [&appState]() {
-        auto j = appState.CalculatorState.to_json();
-        std::string stateSerialized = j.dump();
-        HelloImGui::SaveUserPref("CalculatorState", stateSerialized);
-    };
-
-    HelloImGui::Run(params);
-    return 0;
 }
