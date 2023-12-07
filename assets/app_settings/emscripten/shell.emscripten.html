@@ -4,27 +4,47 @@
     <link rel="icon" type="image/x-icon" href="@HELLO_IMGUI_FAVICON@">
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no"/>
-    <title>BLABLABLA @HELLO_IMGUI_ICON_DISPLAY_NAME@</title>
+    <title>@HELLO_IMGUI_ICON_DISPLAY_NAME@</title>
+
+    <!--             # width and height should be 100% on smaller screen (phones) and 350x600 on desktop -->
+
     <style>
-        body { margin: 0; background-color: black }
+        body {
+            margin: 0;
+            background-color: black;
+        }
+
         .emscripten {
             position: absolute;
             top: 0px;
             left: 0px;
             margin: 0px;
             border: 0;
-            width: 350px;
-            height: 600px;
+            width: 100%;   /* Default to 100% for smaller screens */
+            height: 100%;
             overflow: hidden;
             display: block;
             image-rendering: optimizeSpeed;
             image-rendering: crisp-edges;
             -ms-interpolation-mode: nearest-neighbor;
         }
+
+        /* CSS Media Query for Desktop Screens: set fixed size for desktop
+        */
+        @media (min-width: 600px) {
+            .emscripten {
+                width: 350px;  /* Fixed width for desktop */
+                height: 600px; /* Fixed height for desktop */
+            }
+        }
+
     </style>
 </head>
 <body>
+
+
 <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+
 <script type='text/javascript'>
     var Module = {
         preRun: [],
