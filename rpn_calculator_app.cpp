@@ -192,7 +192,8 @@ auto ComputeButtonsSizes(int nbRows, int nbCols, float calculatorBorderMargin)
         ImGui::GetWindowHeight()
         - ImGui::GetCursorPosY()
         - totalButtonsSpacing.y
-        - calculatorBorderMargin * 2.f;
+        - calculatorBorderMargin * 2.f
+        - 6.f;
     float buttonHeight = remainingHeight / (float)nbRows;
 
     ImVec2 standardButtonSize = ImVec2(buttonWidth, buttonHeight);
@@ -354,7 +355,7 @@ void HandleComputerKeyboard(CalculatorState& calculatorState)
     // (but do not steal it if the user is mousing)
     if (!ImGui::IsAnyItemFocused() && !ImGui::IsAnyItemActive())
         ImGui::SetKeyboardFocusHere();
-    ImVec2 textSize(1.f, 1.f);
+    ImVec2 textSize(0.5f, 0.5f);
     ImGui::InputTextMultiline("##hidden_input", buffer, IM_ARRAYSIZE(buffer), textSize,
                      ImGuiInputTextFlags_CallbackCharFilter, TextEditCallbackStub, &calculatorState);
 
@@ -377,7 +378,8 @@ int main(int, char **)
 {
     AppState appState;
     HelloImGui::RunnerParams params;
-    params.appWindowParams.windowGeometry.size = { 350, 600 };
+    params.appWindowParams.windowTitle = "RPN Calculator";
+    params.appWindowParams.windowGeometry.size = { 340, 600 };
     params.callbacks.ShowGui = [&appState]() {  ShowGui(appState); };
 
     // Fonts loading
@@ -391,7 +393,6 @@ int main(int, char **)
     // Serialization
     params.callbacks.PostInit = [&appState]()
     {
-        return;
         std::string stateSerialized = HelloImGui::LoadUserPref("CalculatorState");
         if (stateSerialized.empty())
             return;

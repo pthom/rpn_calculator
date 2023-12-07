@@ -389,7 +389,6 @@ namespace RpnCalculator
 
     void CalculatorState::OnComputerKey(char key)
     {
-        printf("OnComputerKey: %c\n", key);
         if (key >= '0' && key <= '9')
             _onDigit(std::string(1, key));
         if (key == 'E' || key == 'e')
@@ -488,6 +487,7 @@ namespace RpnCalculator
         j["ErrorMessage"] = ErrorMessage;
         j["InverseMode"] = InverseMode;
         j["AngleUnit"] = AngleUnit;
+        j["StoredValue"] = StoredValue;
 
         return j;
     }
@@ -500,6 +500,8 @@ namespace RpnCalculator
         ErrorMessage = j["ErrorMessage"].get<std::string>();
         InverseMode = j["InverseMode"].get<bool>();
         AngleUnit = j["AngleUnit"].get<AngleUnitType>();
+        if (j.contains("StoredValue"))
+            StoredValue = j["StoredValue"].get<double>();
     }
 
 }
