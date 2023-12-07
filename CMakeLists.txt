@@ -2,6 +2,12 @@ cmake_minimum_required(VERSION 3.12)
 project(rpn_calculator)
 set(CMAKE_CXX_STANDARD 17)
 
+if (NOT TARGET hello_imgui)
+    if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../imgui_bundle/external/hello_imgui/hello_imgui)
+        message(STATUS "Using hello_imgui from imgui_bundle")
+        add_subdirectory(../imgui_bundle/external/hello_imgui/hello_imgui hello_imgui)
+    endif()
+endif()
 
 ##########################################################
 # Prepare hello_imgui during configure time
