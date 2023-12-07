@@ -177,6 +177,7 @@ bool DrawOneCalculatorButton(
     return pressed;
 }
 
+
 auto ComputeButtonsSizes(int nbRows, int nbCols, float calculatorBorderMargin)
 {
     ImVec2 spacing = ImGui::GetStyle().ItemSpacing;
@@ -191,14 +192,14 @@ auto ComputeButtonsSizes(int nbRows, int nbCols, float calculatorBorderMargin)
         ImGui::GetWindowHeight()
         - ImGui::GetCursorPosY()
         - totalButtonsSpacing.y
-        - calculatorBorderMargin * 2.f
-        - 6.f;
+        - calculatorBorderMargin * 2.f;
     float buttonHeight = remainingHeight / (float)nbRows;
 
     ImVec2 standardButtonSize = ImVec2(buttonWidth, buttonHeight);
     ImVec2 doubleButtonSize = ImVec2(standardButtonSize.x * 2 + ImGui::GetStyle().ItemSpacing.x, standardButtonSize.y);
     return std::make_tuple(standardButtonSize, doubleButtonSize);
 }
+
 
 // Layout 4 buttons per row (with possible double width)
 // Returns the pressed button
@@ -303,65 +304,31 @@ void GuiDisplay(AppState& appState)
 }
 
 
-
-void HandleComputerKeyboardOld(CalculatorState& calculatorState)
-{
-    // Draw an invisible input text field to capture keyboard input
-    static char buffer[2000] = "";
-
-    // We need to change the InputTextMultiline's id at each user input, in order to be able to reset it
-    // (it seems like ImGui caches values somewhere)
-    static int idx = 0;
-    std::string id = std::string("##hidden_txt") + std::to_string(idx);
-
-    // Make sure the next input text has focus, so it can capture keyboard input
-    // (but do not steal it if the user is mousing)
-    if (!ImGui::IsAnyItemFocused() && !ImGui::IsAnyItemActive())
-        ImGui::SetKeyboardFocusHere();
-    ImVec2 textSize(1.f, 1.f);
-    if (ImGui::InputTextMultiline(id.c_str(), buffer, 256, textSize))
-    {
-        if (strlen(buffer) == 1)
-            calculatorState.OnComputerKey(buffer[0]);
-        // Change the id for the next frame
-        ++idx;
-        // So that ImGui accepts to take into account that the buffer was reset
-        buffer[0] = '\0';
-    }
-
-    if (ImGui::IsKeyPressed(ImGuiKey_Backspace))
-        calculatorState.OnComputerKey('\b');
-}
-
-static int TextEditCallbackStub(ImGuiInputTextCallbackData* data) {
-    // You can store your state object in the `UserData` field of the callback data structure
-    CalculatorState* calculatorState = static_cast<CalculatorState*>(data->UserData);
-    if (data->EventFlag == ImGuiInputTextFlags_CallbackCharFilter)
-    {
-        // This event is triggered for every character input.
-        char c = static_cast<char>(data->EventChar);
-        calculatorState->OnComputerKey(c);
-    }
-    return 0;
-}
-
 void HandleComputerKeyboard(CalculatorState& calculatorState)
 {
-    // Draw an invisible input text field to capture keyboard input
-    static char buffer[2000] = "";
-
-    // Make sure the next input text has focus, so it can capture keyboard input
-    // (but do not steal it if the user is mousing)
     if (!ImGui::IsAnyItemFocused() && !ImGui::IsAnyItemActive())
         ImGui::SetKeyboardFocusHere();
-    ImVec2 textSize(0.5f, 0.5f);
-    ImGui::InputTextMultiline("##hidden_input", buffer, IM_ARRAYSIZE(buffer), textSize,
-                     ImGuiInputTextFlags_CallbackCharFilter, TextEditCallbackStub, &calculatorState);
+    ImGui::Dummy(ImVec2(0, 0)); // This is needed to make the input text field capture keyboard input
 
+    auto& io = ImGui::GetIO();
+    io.WantCaptureKeyboard = true;
+    if (io.InputQueueCharacters.Size > 0)
+    {
+        for (int n = 0; n < io.InputQueueCharacters.Size; n++)
+        {
+            ImWchar c = io.InputQueueCharacters[n];
+            char asChar = static_cast<char>(c);
+            calculatorState.OnComputerKey(asChar);
+        }
+        // Consume characters
+        io.InputQueueCharacters.resize(0);
+    }
     if (ImGui::IsKeyPressed(ImGuiKey_Backspace))
         calculatorState.OnComputerKey('\b');
-
+    if (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeyPadEnter))
+        calculatorState.OnComputerKey('\n');
 }
+
 
 void ShowGui(AppState& appState)
 {
