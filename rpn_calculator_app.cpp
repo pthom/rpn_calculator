@@ -24,6 +24,7 @@ std::map<ButtonType, ImVec4> ButtonColors = {
     { ButtonType::UnaryOperator, { 0.4f, 0.4f, 0.8f, 1.0f } },
     { ButtonType::StackOperator, { 0.4f, 0.3f, 0.3f, 1.0f } },
     { ButtonType::Inv, { 0.8f, 0.6f, 0.0f, 1.0f } },
+    { ButtonType::ScientificMode, { 0.8f, 0.6f, 0.0f, 1.0f } },
     { ButtonType::DegRadGrad, { 0.6f, 0.6f, 0.0f, 1.0f } },
     { ButtonType::Enter, { 0.0f, 0.7f, 0.0f, 1.0f } },
 };
@@ -209,7 +210,8 @@ std::optional<CalculatorButton> LayoutButtons(AppState& appState)
     float calculatorBorderMargin = HelloImGui::EmSize(0.5f);
     ImGui::GetStyle().ItemSpacing = {calculatorBorderMargin, calculatorBorderMargin};
 
-    const auto& buttonsRows = appState.CalculatorState.CalculatorLayoutDefinition.Buttons;
+    const auto& buttonsRows = appState.CalculatorState.CalculatorLayoutDefinition.GetButtons(
+        appState.CalculatorState.ScientificMode);
     int nbRows = (int)buttonsRows.size();
     int nbCols = appState.CalculatorState.CalculatorLayoutDefinition.NbButtonsPerRow;
 
@@ -258,6 +260,15 @@ void GuiDisplay(AppState& appState)
         std::string angleUnitStr = to_string(calculatorState.AngleUnit);
         ImGui::SameLine((float)(int)(calculatorState.AngleUnit) * HelloImGui::EmSize(2.f));
         ImGui::Text("%s", angleUnitStr.c_str());
+
+        // Display scientific mode indicator
+        {
+            ImGui::SameLine(ImGui::GetWindowWidth() / 2.f - HelloImGui::EmSize(3.f));
+            if (calculatorState.ScientificMode)
+                ImGui::Text("Scientific");
+            else
+                ImGui::Text("Classic");
+        }
 
         // Display Inv indicator on the same line,but at the right
         if (calculatorState.InverseMode)

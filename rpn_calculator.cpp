@@ -5,7 +5,7 @@ namespace RpnCalculator
 {
     CalculatorLayoutDefinition::CalculatorLayoutDefinition()
     {
-        Buttons = {
+        ButtonsScientificMode = {
             {   { "Inv", ButtonType::Inv},
                 { "Deg", ButtonType::DegRadGrad, "To Deg"},
                 { "Rad", ButtonType::DegRadGrad, "To Rad"},
@@ -30,8 +30,8 @@ namespace RpnCalculator
 
             {   { "Sto", ButtonType::StackOperator },
                 { "Recall", ButtonType::StackOperator },
-                { "Roll", ButtonType::StackOperator },
-                { "Undo", ButtonType::StackOperator }},
+                { "Undo", ButtonType::StackOperator },
+                { "Sci", ButtonType::ScientificMode }},
 
             {   { "Swap", ButtonType::StackOperator },
                 { "Dup", ButtonType::StackOperator },
@@ -62,8 +62,16 @@ namespace RpnCalculator
                 { "+/-", ButtonType::Digit },
                 { "+", ButtonType::BinaryOperator }},
         };
+
+        // ButtonsBasicMode = ButtonsScientificMode without the first 4 rows
+        ButtonsBasicMode = ButtonsScientificMode;
+        ButtonsBasicMode.erase(ButtonsBasicMode.begin(), ButtonsBasicMode.begin() + 4);
     }
 
+    std::vector<std::vector<CalculatorButtonWithInverse>>& CalculatorLayoutDefinition::GetButtons(bool scientificMode)
+    {
+        return scientificMode ? ButtonsScientificMode : ButtonsBasicMode;
+    }
 
 
     CalculatorButtonWithInverse::CalculatorButtonWithInverse(
@@ -476,6 +484,8 @@ namespace RpnCalculator
             _onDegRadGrad(button.Label);
         else if (button.Type == ButtonType::Inv)
             _onInverse();
+        else if (button.Type == ButtonType::ScientificMode)
+            ScientificMode = !ScientificMode;
     }
 
     // Serialization

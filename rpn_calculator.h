@@ -22,7 +22,9 @@ namespace RpnCalculator
 
         Inv,            // Inverse
         DegRadGrad,     // Degree, Radian, Gradian
-        Enter           // Enter
+        Enter,           // Enter
+
+        ScientificMode,  // Scientific mode
     };
 
 
@@ -80,10 +82,13 @@ namespace RpnCalculator
         ==============================
          */
         CalculatorLayoutDefinition();
-        std::vector<std::vector<CalculatorButtonWithInverse>> Buttons;
         int DisplayedStackSize = 4;
         int NbButtonsPerRow = 4;
         int NbDecimals = 12;
+        std::vector<std::vector<CalculatorButtonWithInverse>>& GetButtons(bool scientificMode);
+    private:
+        std::vector<std::vector<CalculatorButtonWithInverse>> ButtonsBasicMode;
+        std::vector<std::vector<CalculatorButtonWithInverse>> ButtonsScientificMode;
     };
 
 
@@ -128,6 +133,7 @@ namespace RpnCalculator
         std::string ErrorMessage;
         double StoredValue = 0.;
         UndoableNumberStack Stack;
+        bool ScientificMode = false;
 
         // callbacks
 
