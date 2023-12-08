@@ -505,13 +505,20 @@ namespace RpnCalculator
     // Deserialization
     void CalculatorState::from_json(const nlohmann::json& j)
     {
-        Stack.from_json(j["Stack"]);
-        Input = j["Input"].get<std::string>();
-        ErrorMessage = j["ErrorMessage"].get<std::string>();
-        InverseMode = j["InverseMode"].get<bool>();
-        AngleUnit = j["AngleUnit"].get<AngleUnitType>();
-        if (j.contains("StoredValue"))
-            StoredValue = j["StoredValue"].get<double>();
+        try
+        {
+            Stack.from_json(j["Stack"]);
+            Input = j["Input"].get<std::string>();
+            ErrorMessage = j["ErrorMessage"].get<std::string>();
+            InverseMode = j["InverseMode"].get<bool>();
+            AngleUnit = j["AngleUnit"].get<AngleUnitType>();
+            if (j.contains("StoredValue"))
+                StoredValue = j["StoredValue"].get<double>();
+        }
+        catch (nlohmann::json::type_error&)
+        {
+            fprintf(stderr, "from_json: exception caught\n");
+        }
     }
 
 }
