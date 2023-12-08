@@ -316,7 +316,7 @@ void GuiDisplay(AppState& appState)
     {
         int stackIndex = (int)calculatorState.Stack.size() - nbViewableStackLines + i;
         if (stackIndex < 0)
-            ImGui::Text("");
+            ImGui::Text(" ");
         else
         {
             ImGui::Text("%i:", nbViewableStackLines - i);
