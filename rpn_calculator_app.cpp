@@ -287,9 +287,12 @@ void GuiDisplay(AppState& appState)
     {
         ImGui::PushFont(appState.SmallFont);
         // Display angle unit
-        std::string angleUnitStr = to_string(calculatorState.AngleUnit);
-        ImGui::SameLine((float)(int)(calculatorState.AngleUnit) * HelloImGui::EmSize(2.f));
-        ImGui::Text("%s", angleUnitStr.c_str());
+        if (calculatorState.ScientificMode)
+        {
+            std::string angleUnitStr = to_string(calculatorState.AngleUnit);
+            ImGui::SameLine((float)(int)(calculatorState.AngleUnit) * HelloImGui::EmSize(2.f));
+            ImGui::Text("%s", angleUnitStr.c_str());
+        }
 
         // Display scientific mode indicator
         {
