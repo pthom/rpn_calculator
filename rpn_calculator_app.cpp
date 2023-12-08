@@ -39,7 +39,7 @@ std::map<ButtonType, ImVec4> ButtonColors = {
 struct AppState
 {
     ImFont* ButtonFont = nullptr, *LDCFont = nullptr, *SmallFont = nullptr;
-    CalculatorState CalculatorState;
+    CalculatorState CalcState;
 };
 
 
@@ -230,10 +230,10 @@ std::optional<CalculatorButton> LayoutButtons(AppState& appState)
     float calculatorBorderMargin = HelloImGui::EmSize(0.5f);
     ImGui::GetStyle().ItemSpacing = {calculatorBorderMargin, calculatorBorderMargin};
 
-    const auto& buttonsRows = appState.CalculatorState.CalculatorLayoutDefinition.GetButtons(
-        appState.CalculatorState.ScientificMode);
+    const auto& buttonsRows = appState.CalcState.LayoutDefinition.GetButtons(
+        appState.CalcState.ScientificMode);
     int nbRows = (int)buttonsRows.size();
-    int nbCols = appState.CalculatorState.CalculatorLayoutDefinition.NbButtonsPerRow;
+    int nbCols = appState.CalcState.LayoutDefinition.NbButtonsPerRow;
 
     // Calculate buttons size so that they fit the remaining space
     auto [standardButtonSize, doubleButtonSize] = ComputeButtonsSizes(nbRows, nbCols, calculatorBorderMargin);
@@ -246,7 +246,7 @@ std::optional<CalculatorButton> LayoutButtons(AppState& appState)
         ImGui::SetCursorPosX(calculatorBorderMargin);
         for (const auto& buttonWithInverse: buttonRow)
         {
-            bool inverseMode = appState.CalculatorState.InverseMode && buttonWithInverse.InverseButton.has_value();
+            bool inverseMode = appState.CalcState.InverseMode && buttonWithInverse.InverseButton.has_value();
             const CalculatorButton& button = buttonWithInverse.GetCurrentButton(inverseMode);
             if (DrawOneCalculatorButton(button, inverseMode, standardButtonSize, doubleButtonSize, appState.SmallFont))
                 pressedButton = button;
@@ -261,7 +261,7 @@ std::optional<CalculatorButton> LayoutButtons(AppState& appState)
 
 void GuiDisplay(AppState& appState)
 {
-    const auto& calculatorState = appState.CalculatorState;
+    const auto& calculatorState = appState.CalcState;
 
 #if TARGET_OS_IPHONE
     // Draw a black zone on top of the notch
@@ -311,7 +311,7 @@ void GuiDisplay(AppState& appState)
 
     // Display the stack
     ImGui::PushFont(appState.LDCFont);
-    int nbViewableStackLines = calculatorState.CalculatorLayoutDefinition.DisplayedStackSize;
+    int nbViewableStackLines = calculatorState.LayoutDefinition.DisplayedStackSize;
     for (int i = 0; i < nbViewableStackLines; ++i)
     {
         int stackIndex = (int)calculatorState.Stack.size() - nbViewableStackLines + i;
@@ -322,7 +322,7 @@ void GuiDisplay(AppState& appState)
             ImGui::Text("%i:", nbViewableStackLines - i);
             // Display the stack value at the right of the screen
             // Convert value to string with a fixed number of decimals
-            int nbDecimals = calculatorState.CalculatorLayoutDefinition.NbDecimals;
+            int nbDecimals = calculatorState.LayoutDefinition.NbDecimals;
             char valueAsString[64];
             snprintf(valueAsString, 64, "%.*G", nbDecimals, calculatorState.Stack[stackIndex]);
             ImVec2 textSize = ImGui::CalcTextSize(valueAsString);
@@ -376,8 +376,8 @@ void ShowGui(AppState& appState)
     GuiDisplay(appState);
     auto pressedButton = LayoutButtons(appState);
     if (pressedButton)
-        appState.CalculatorState.OnCalculatorButton(pressedButton.value());
-    HandleComputerKeyboard(appState.CalculatorState);
+        appState.CalcState.OnCalculatorButton(pressedButton.value());
+    HandleComputerKeyboard(appState.CalcState);
 }
 
 
@@ -408,7 +408,7 @@ int main(int, char **)
     // Serialization
     auto saveSettings = [&appState]()
     {
-        auto j = appState.CalculatorState.to_json();
+        auto j = appState.CalcState.to_json();
         std::string stateSerialized = j.dump();
         HelloImGui::SaveUserPref("CalculatorState", stateSerialized);
     };
@@ -420,7 +420,7 @@ int main(int, char **)
         auto j  = nlohmann::json::parse(stateSerialized, nullptr, false);
 
         if (!j.is_null())
-            appState.CalculatorState.from_json(j);
+            appState.CalcState.from_json(j);
         else
             printf("Failed to load calculator state from user pref\n");
     };

@@ -3,6 +3,7 @@
 #include <deque>
 #include <stack>
 #include <sstream>
+#include <optional>
 #include "nlohmann_json.hpp"
 
 
@@ -126,7 +127,7 @@ namespace RpnCalculator
     {
     public:
         // public members (displayed by the application)
-        CalculatorLayoutDefinition CalculatorLayoutDefinition;
+        CalculatorLayoutDefinition LayoutDefinition;
         bool InverseMode = false;
         AngleUnitType AngleUnit = AngleUnitType::Deg;
         std::string Input;
