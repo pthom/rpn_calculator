@@ -12,6 +12,12 @@
 
 #include "rpn_calculator.h"
 
+#if defined(__APPLE__) && (defined(__GNUC__) || \
+    defined(__xlC__) || defined(__xlc__))
+#include <TargetConditionals.h>
+#endif
+
+
 using namespace RpnCalculator;
 
 
@@ -178,6 +184,17 @@ bool DrawOneCalculatorButton(
     return pressed;
 }
 
+#if TARGET_OS_IPHONE
+float IOS_NotchHeight()
+{
+    return HelloImGui::EmSize(2.f);;
+}
+float IOS_BottomMargin()
+{
+    return HelloImGui::EmSize(1.5f);
+}
+#endif
+
 
 auto ComputeButtonsSizes(int nbRows, int nbCols, float calculatorBorderMargin)
 {
@@ -194,6 +211,9 @@ auto ComputeButtonsSizes(int nbRows, int nbCols, float calculatorBorderMargin)
         - ImGui::GetCursorPosY()
         - totalButtonsSpacing.y
         - calculatorBorderMargin * 2.f;
+#if TARGET_OS_IPHONE
+    remainingHeight -= IOS_BottomMargin();
+#endif
     float buttonHeight = remainingHeight / (float)nbRows;
 
     ImVec2 standardButtonSize = ImVec2(buttonWidth, buttonHeight);
@@ -243,13 +263,23 @@ void GuiDisplay(AppState& appState)
 {
     const auto& calculatorState = appState.CalculatorState;
 
+#if TARGET_OS_IPHONE
+    // Draw a black zone on top of the notch
+    ImGui::GetForegroundDrawList()->AddRectFilled(
+        ImVec2(0.f, 0.f),
+        ImVec2(ImGui::GetWindowWidth(), IOS_NotchHeight()),
+        IM_COL32(0, 0, 0, 255)
+    );
+    ImGui::SetCursorPosY(IOS_NotchHeight());
+#endif
+
     //
     // Display the RPN number stack in a child window that resembles a LCD display
     //
     // Create a child window with a grey background color
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.75f, 0.75f, 0.75f, 1.f));
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.f, 0.f, 0.f, 1.f));
-    ImGui::SetCursorPos(ImGui::GetStyle().ItemSpacing);
+    ImGui::SetCursorPos(ImGui::GetCursorPos() + ImGui::GetStyle().ItemSpacing);
     float childWith = ImGui::GetWindowWidth() - ImGui::GetStyle().ItemSpacing.x * 2.f;
     ImGui::BeginChild("StackDisplay", ImVec2(childWith, 0), ImGuiChildFlags_AutoResizeY);
 
@@ -350,10 +380,6 @@ void ShowGui(AppState& appState)
     HandleComputerKeyboard(appState.CalculatorState);
 }
 
-#if defined(__APPLE__) && (defined(__GNUC__) || \
-    defined(__xlC__) || defined(__xlc__))
-#include <TargetConditionals.h>
-#endif
 
 
 int main(int, char **)
