@@ -350,13 +350,25 @@ void ShowGui(AppState& appState)
     HandleComputerKeyboard(appState.CalculatorState);
 }
 
+#if defined(__APPLE__) && (defined(__GNUC__) || \
+    defined(__xlC__) || defined(__xlc__))
+#include <TargetConditionals.h>
+#endif
+
 
 int main(int, char **)
 {
     AppState appState;
     HelloImGui::RunnerParams params;
     params.appWindowParams.windowTitle = "RPN Calculator";
+    params.iniFolderType = HelloImGui::IniFolderType::AppUserConfigFolder;
+
+#if TARGET_OS_IPHONE
+    params.appWindowParams.windowGeometry.fullScreenMode = HelloImGui::FullScreenMode::FullScreen;
+#else
     params.appWindowParams.windowGeometry.size = { 340, 600 };
+#endif
+
     params.callbacks.ShowGui = [&appState]() {  ShowGui(appState); };
 
     // Fonts loading
@@ -368,7 +380,13 @@ int main(int, char **)
     };
 
     // Serialization
-    params.callbacks.PostInit = [&appState]()
+    auto saveSettings = [&appState]()
+    {
+        auto j = appState.CalculatorState.to_json();
+        std::string stateSerialized = j.dump();
+        HelloImGui::SaveUserPref("CalculatorState", stateSerialized);
+    };
+    auto readSettings = [&appState]()
     {
         std::string stateSerialized = HelloImGui::LoadUserPref("CalculatorState");
         if (stateSerialized.empty())
@@ -380,12 +398,12 @@ int main(int, char **)
         else
             printf("Failed to load calculator state from user pref\n");
     };
-    params.callbacks.BeforeExit = [&appState]()
-    {
-        auto j = appState.CalculatorState.to_json();
-        std::string stateSerialized = j.dump();
-        HelloImGui::SaveUserPref("CalculatorState", stateSerialized);
-    };
+
+    params.callbacks.PostInit = readSettings;
+    params.callbacks.BeforeExit = saveSettings;
+#if TARGET_OS_IPHONE
+    params.callbacks.mobileCallbacks.OnDestroy = saveSettings;
+#endif
 
     // Go!
     HelloImGui::Run(params);
