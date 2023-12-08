@@ -5,11 +5,14 @@
     <key>CFBundleIdentifier</key>
     <string>${HELLO_IMGUI_BUNDLE_IDENTIFIER}</string>
 
+	<key>CFProductBundleIdentifier</key>
+	<string>${HELLO_IMGUI_BUNDLE_IDENTIFIER}</string>
+
 	<key>CFBundleName</key>
 	<string>${HELLO_IMGUI_BUNDLE_NAME}</string>
 
 	<key>CFBundleDisplayName</key>
-	<string>${HELLO_IMGUI_ICON_DISPLAY_NAME}</string>
+	<string>RPN Calculator</string>
 
 	<key>CFBundleExecutable</key>
 	<string>${HELLO_IMGUI_BUNDLE_EXECUTABLE}</string>
