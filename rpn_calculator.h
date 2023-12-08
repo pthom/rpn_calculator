@@ -92,7 +92,7 @@ namespace RpnCalculator
     };
 
 
-    struct UndoableNumberStack
+    struct CalculatorStack
     {
         std::deque<double> Stack;
         std::stack<std::deque<double>> _undoStack;
@@ -132,7 +132,7 @@ namespace RpnCalculator
         std::string Input;
         std::string ErrorMessage;
         double StoredValue = 0.;
-        UndoableNumberStack Stack;
+        CalculatorStack Stack;
         bool ScientificMode = false;
 
         // callbacks
