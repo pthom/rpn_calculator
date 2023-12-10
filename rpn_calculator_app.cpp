@@ -417,6 +417,7 @@ int main(int, char **)
     };
     auto readSettings = [&appState]()
     {
+        return;
         std::string stateSerialized = HelloImGui::LoadUserPref("CalculatorState");
         if (stateSerialized.empty())
             return;
