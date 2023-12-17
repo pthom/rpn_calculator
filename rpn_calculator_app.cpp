@@ -184,17 +184,6 @@ bool DrawOneCalculatorButton(
     return pressed;
 }
 
-#if TARGET_OS_IPHONE
-float IOS_NotchHeight()
-{
-    return HelloImGui::EmSize(2.f);;
-}
-float IOS_BottomMargin()
-{
-    return HelloImGui::EmSize(1.5f);
-}
-#endif
-
 
 auto ComputeButtonsSizes(int nbRows, int nbCols, float calculatorBorderMargin)
 {
@@ -211,9 +200,6 @@ auto ComputeButtonsSizes(int nbRows, int nbCols, float calculatorBorderMargin)
         - ImGui::GetCursorPosY()
         - totalButtonsSpacing.y
         - calculatorBorderMargin * 2.f;
-#if TARGET_OS_IPHONE
-    remainingHeight -= IOS_BottomMargin();
-#endif
     float buttonHeight = remainingHeight / (float)nbRows;
 
     ImVec2 standardButtonSize = ImVec2(buttonWidth, buttonHeight);
@@ -262,16 +248,6 @@ std::optional<CalculatorButton> LayoutButtons(AppState& appState)
 void GuiDisplay(AppState& appState)
 {
     const auto& calculatorState = appState.CalcState;
-
-#if TARGET_OS_IPHONE
-    // Draw a black zone on top of the notch
-    ImGui::GetForegroundDrawList()->AddRectFilled(
-        ImVec2(0.f, 0.f),
-        ImVec2(ImGui::GetWindowWidth(), IOS_NotchHeight()),
-        IM_COL32(0, 0, 0, 255)
-    );
-    ImGui::SetCursorPosY(IOS_NotchHeight());
-#endif
 
     //
     // Display the RPN number stack in a child window that resembles a LCD display
@@ -391,12 +367,7 @@ int main(int, char **)
     HelloImGui::RunnerParams params;
     params.appWindowParams.windowTitle = "RPN Calculator";
     params.iniFolderType = HelloImGui::IniFolderType::AppUserConfigFolder;
-
-#if TARGET_OS_IPHONE
-    params.appWindowParams.windowGeometry.fullScreenMode = HelloImGui::FullScreenMode::FullScreen;
-#else
     params.appWindowParams.windowGeometry.size = { 340, 600 };
-#endif
 
     params.callbacks.ShowGui = [&appState]() {  ShowGui(appState); };
 
@@ -430,7 +401,7 @@ int main(int, char **)
 
     params.callbacks.PostInit = readSettings;
     params.callbacks.BeforeExit = saveSettings;
-#if TARGET_OS_IPHONE
+#if TARGET_OS_IPHONE || __ANDROID__
     params.callbacks.mobileCallbacks.OnDestroy = saveSettings;
 #endif
 
