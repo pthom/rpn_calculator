@@ -3,9 +3,12 @@ project(rpn_calculator)
 set(CMAKE_CXX_STANDARD 17)
 
 if (NOT TARGET hello_imgui)
-    if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../imgui_bundle/external/hello_imgui/hello_imgui)
+    # If CMAKE_CURRENT_LIST_DIR is a symlink, make it a real path
+    get_filename_component(current_script_dir_real ${CMAKE_CURRENT_LIST_DIR} REALPATH)
+
+    if (EXISTS ${current_script_dir_real}/../imgui_bundle/external/hello_imgui/hello_imgui)
         message(STATUS "Using hello_imgui from imgui_bundle")
-        add_subdirectory(../imgui_bundle/external/hello_imgui/hello_imgui hello_imgui)
+        add_subdirectory(${current_script_dir_real}/../imgui_bundle/external/hello_imgui/hello_imgui hello_imgui)
     endif()
 endif()
 
