@@ -368,6 +368,7 @@ int main(int, char **)
     params.appWindowParams.windowTitle = "RPN Calculator";
     params.iniFolderType = HelloImGui::IniFolderType::AppUserConfigFolder;
     params.appWindowParams.windowGeometry.size = { 340, 600 };
+    params.appWindowParams.borderless = true;
 
     params.callbacks.ShowGui = [&appState]() {  ShowGui(appState); };
 
