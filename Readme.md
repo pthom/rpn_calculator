@@ -77,26 +77,25 @@ Add this line at the top of your CMakeLists.txt
 add_subdirectory(external/hello_imgui)
 ```
 
-#### 2. Download SDL
-Run the following command to download SDL2:
-
-```bash
-./external/hello_imgui/tools/sdl_download.sh
-```
-
-#### 3. Create the Android Studio project
+#### 2. Create the Android Studio project
 ```bash
 mkdir build_android && cd build_android
 ../external/hello_imgui/tools/android/cmake_arm-android.sh ../
 ```
 
-#### 4. Open the project in Android Studio
+#### 3. Open the project in Android Studio
 It should be located in build_android/rpn_calculator_AndroidStudio.
 
 
 ### Build for iOS
 
-#### 1. Clone hello_imgui and download SDL: follow steps 1 and 2 from the Android section above.
+#### 1. Clone hello_imgui
+
+```bash
+mkdir -p external && cd external
+git clone https://github.com/pthom/hello_imgui.git
+cd ..
+```
 
 #### 2. Create the Xcode project
 ```bash
@@ -116,4 +115,17 @@ cmake .. \
 -DHELLOIMGUI_USE_SDL_OPENGL3=ON
 ```
 
-Then, open the XCode project in build_ios/rpn_calculator.xcodeproj
+### Build for emscripten
+
+```bash
+mkdir build_ems && cd build_ems/
+source ~/emsdk/emsdk_env.sh      # Activate emscripten (see https://emscripten.org/docs/getting_started/downloads.html)
+emcmake cmake ..
+make -j
+```
+
+Then, run a web-server, e.g.
+
+```bash
+python3 -m http.server  # and then browse to http://localhost:8000
+```
