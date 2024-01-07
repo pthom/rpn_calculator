@@ -3,7 +3,7 @@
 A simple RPN Calculator, demonstrating how easy it can be to create a  truly multi-platform application with 
 [Dear ImGui](https://github.com/ocornut/imgui), and [Hello ImGui](https://github.com/pthom/hello_imgui).
 
-Works under Windows, Linux, macOS, emscripten, iOS (as a native app, or as a Web Clip)
+Works under Windows, Linux, macOS, emscripten, iOS (as a native app, or as a Web Clip), Android
 
 [Online calculator](https://traineq.org/HelloImGui/rpn/rpn_calculator.html)
 
