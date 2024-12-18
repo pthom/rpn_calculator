@@ -345,7 +345,7 @@ void HandleComputerKeyboard(CalculatorState& calculatorState)
     }
     if (ImGui::IsKeyPressed(ImGuiKey_Backspace))
         calculatorState.OnComputerKey('\b');
-    if (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeyPadEnter))
+    if (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter))
         calculatorState.OnComputerKey('\n');
 }
 
