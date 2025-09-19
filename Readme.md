@@ -11,6 +11,19 @@ Works under Windows, Linux, macOS, emscripten, iOS (as a native app, or as a Web
 
 ![screenshot](screenshot.png)
 
+### How to use the RPN Calculator
+
+* This calculator uses **Reverse Polish Notation (RPN)**: you enter numbers first, then the operator.
+* Example: to compute `3 + 4,` type **3**, press **Enter**, type **4**, then press **+**. The result 7 will appear.
+* The calculator has a stack where numbers are pushed when you press **Enter**. Operators take their inputs from the stack.
+* Use **Swap**, **Dup**, and **Drop** to reorder or manage items on the stack.
+* **Sto** and **Recall** let you store and retrieve values.
+* **Undo** reverts the last action, and Clear resets the stack.
+* Toggle **Sci** to switch between Classic and Scientific modes.
+In Scientific mode, you get functions like sin, cos, tan, log, powers, roots, and constants (π, e).
+* Choose between **Deg**, **Rad**, or **Grad** for trigonometric calculations.
+* The **Inv** button toggles inverse operations (e.g., sin ↔ arcsin).
+
 
 ### Build for Linux and macOS
 
